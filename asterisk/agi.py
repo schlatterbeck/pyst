@@ -300,12 +300,9 @@ class AGI:
         """agi.say_time(time_string, escape_digits='') --> digit
         Say a given time, returning early if any of the given DTMF digits are
 	pressed.  The time should be in seconds since the UNIX Epoch (Jan 1, 1970 00:00:00)
-	the given DTMF digits are received on the channel.  
-        Throws AGIException on channel failure
         """
-        characters = self._process_digit_list(characters)
         escape_digits = self._process_digit_list(escape_digits)
-        res = self.execute('say phonetic', characters, escape_digits)['result'][0]
+        res = self.execute('say time', time, escape_digits)['result'][0]
         if res == '-1':
             raise AGIException('Channel falure on channel %s' % self.env.get('agi_channel','UNKNOWN'))
         elif res == '0':
