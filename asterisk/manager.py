@@ -118,6 +118,12 @@ class ManagerMsg(object):
         """Return the specfied header"""
         return self.headers[hname]
 
+    def __getitem__(self, hname):
+        """Return the specfied header"""
+        return self.headers[hname]
+    def __repr__(self):
+        return self.headers['Response']
+
 
 class Event(object):
     """Manager interface Events, __init__ expects and 'Event' message"""
@@ -197,7 +203,7 @@ class Manager(object):
         cdict.update(kwargs)
 
         # set the action id
-        cdict['ActionID'] = '%s-%08x' % (self.hostname, self.next_seq())
+        if not cdict.has_key('ActionID'): cdict['ActionID'] = '%s-%08x' % (self.hostname, self.next_seq())
         clist = []
 
         # generate the command
@@ -273,7 +279,7 @@ class Manager(object):
                             c = self.sock.recv(1)
 
                             if not c:  # the other end closed the connection
-                                self.sock.shutdown(2)
+                                self.sock.shutdown(1)
                                 self.sock.close()
                                 self.connected = 0
                                 break
@@ -565,7 +571,7 @@ class Manager(object):
 
         return response
 
-    def originate(self, channel, exten, context='', priority='', timeout='', caller_id=''):
+    def originate(self, channel, exten, context='', priority='', timeout='', caller_id='', async=False, variables={}):
         """Originate a call"""
 
         if not self.connected:
@@ -577,6 +583,10 @@ class Manager(object):
         if priority:  cdict['Priority'] = priority
         if timeout:   cdict['Timeout']  = timeout
         if caller_id: cdict['CallerID'] = caller_id
+        if async:     cdict['Async']    = 'yes'
+        # join dict of vairables together in a string in the form of 'key=val|key=val'
+        if variables: cdict['Variable'] = '|'.join(['='.join(key, value) for key, value in variables.items()])
+              
         response = self.send_action(cdict)
         
         if not response:
