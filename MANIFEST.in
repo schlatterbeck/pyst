@@ -1,0 +1,7 @@
+include debian/watch
+include debian/rules
+include debian/changelog
+include debian/control
+include debian/compat
+include debian/copyright
+include MANIFEST.in

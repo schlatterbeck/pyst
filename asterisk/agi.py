@@ -1,6 +1,6 @@
 #!/usr/bin/env python2
 
-"""pyst
+"""agi
 
 A module for asterisk AGI programming
 
@@ -248,6 +248,44 @@ class AGI:
         number = self._process_digit_list(number)
         escape_digits = self._process_digit_list(escape_digits)
         res = self.execute('say number', number, escape_digits)['result'][0]
+        if res == '-1':
+            raise AGIException('Channel falure on channel %s' % self.env.get('agi_channel','UNKNOWN'))
+        elif res == '0':
+            return ''
+        else:
+            try:
+                return chr(int(res))
+            except:
+                raise AGIException('Unable to convert result to char: %s' % res)
+
+    def say_alpha(self, characters, escape_digits=''):
+        """agi.say_alpha(string, escape_digits='') --> digit
+        Say a given character string, returning early if any of the given DTMF
+	digits are received on the channel.  
+        Throws AGIException on channel failure
+        """
+        characters = self._process_digit_list(characters)
+        escape_digits = self._process_digit_list(escape_digits)
+        res = self.execute('say alpha', characters, escape_digits)['result'][0]
+        if res == '-1':
+            raise AGIException('Channel falure on channel %s' % self.env.get('agi_channel','UNKNOWN'))
+        elif res == '0':
+            return ''
+        else:
+            try:
+                return chr(int(res))
+            except:
+                raise AGIException('Unable to convert result to char: %s' % res)
+
+    def say_phonetic(self, characters, escape_digits=''):
+        """agi.say_phonetic(string, escape_digits='') --> digit
+        Phonetically say a given character string, returning early if any of
+	the given DTMF digits are received on the channel.  
+        Throws AGIException on channel failure
+        """
+        characters = self._process_digit_list(characters)
+        escape_digits = self._process_digit_list(escape_digits)
+        res = self.execute('say phonetic', characters, escape_digits)['result'][0]
         if res == '-1':
             raise AGIException('Channel falure on channel %s' % self.env.get('agi_channel','UNKNOWN'))
         elif res == '0':

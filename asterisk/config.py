@@ -1,5 +1,4 @@
-""" astconfig.py
-
+"""
 Parse Asterisk configuration files.
 """
 
@@ -97,11 +96,12 @@ class Config(object):
         self.categories = []
 
     def load(self):
-        try:
-            self.raw_lines = open(self.filename).readlines()
-        except IOError:
-            sys.stderr.write('WARNING: error opening filename: %s  No data read. Starting new file?' % self.filename)
-            self.raw_lines = []
+        self.raw_lines = open(self.filename).readlines()
+        #try:
+            #self.raw_lines = open(self.filename).readlines()
+        #except IOError:
+            #sys.stderr.write('WARNING: error opening filename: %s  No data read. Starting new file?' % self.filename)
+            #self.raw_lines = []
 
     def parse(self):
         cat = None

@@ -1,0 +1,33 @@
+Source: pyst
+Section: python
+Priority: optional
+Maintainer: Matthew A. Nicholson <mnicholson@digium.com>
+Build-Depends: debhelper (>= 4.0.0), cdbs
+Build-Depends-Indep: python2.3-dev, python
+Standards-Version: 3.6.1
+
+Package: python2.3-pyst
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, python2.3
+Suggests: asterisk
+Description: Python module for interacting with the Asterisk PBX (dummy)
+ Pyst is a python module for interacting with the asterisk pbx through
+ the manager interface and agi interface.  This package also includes
+ debugging tools such as the agitb module, and tools to parse asterisk
+ config files.
+ .
+ This package is build for Python 2.3.x
+
+Package: python-pyst
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, python (>= 2.3), python (<< 2.4), python2.3-pyst
+Suggests: asterisk
+Description: Python module for interacting with the Asterisk PBX (dummy)
+ Pyst is a python module for interacting with the asterisk pbx through
+ the manager interface and agi interface.  This package also includes
+ debugging tools such as the agitb module, and tools to parse asterisk
+ config files.
+ .
+ This package is an empty dummy package that always depends on a package
+ built for Debian's default Python version
+
