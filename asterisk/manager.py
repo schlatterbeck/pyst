@@ -6,7 +6,7 @@ Interface for Asterisk Manager
 
 """
 
-import sys
+import sys,os
 import socket
 import threading
 import Queue
@@ -14,6 +14,7 @@ import re
 from select import select
 from cStringIO import StringIO
 from types import *
+from time import sleep
 
 EOL = '\r\n'
 
@@ -105,6 +106,7 @@ class Manager(object):
         self.sock = None
         self.sockf = None
         self.connected = 0
+        self.message_queue = Queue.Queue()
         self.response_queue = Queue.Queue()
         self.event_queue = Queue.Queue()
         self.reswaiting = []
@@ -156,26 +158,6 @@ class Manager(object):
            on self.sock_lock
            self.sock should also be ready for reading
         """
-        if not self.sock_lock.locked():
-            raise ManagerException('self.sock_lock is not locked')
-        if self.sock.fileno() < 0:
-            raise ManagerSocketException('Connection Terminated')
-        lines = []
-        while 1:
-            try:
-                line = self.sockf.readline()
-                lines.append(line)
-                if line == EOL:
-                    break
-            except IOError:
-                #continue
-                if line.find('Asterisk Call Manager') >= 0:
-                    self.version = line.split('/')[1].strip()
-                    break
-                #sys.stderr.write('.')
-        return StringIO(''.join(lines))
-
-    def event_loop(self):
         while 1:
             rsocks, wsocks, esocks = select([self.sock],[],[],1)
             if not self.running: break
@@ -183,19 +165,57 @@ class Manager(object):
                 #sys.stderr.write('*')
                 self.sock_lock.acquire()
                 if rsocks:
-                    data = self._receive_data()
-                    #print data.getvalue()
-                    message = ManagerMsg(data)
-                    if message.has_header('Event'):
-                        ev = Event(message)
-                        self.event_queue.put(ev)
-                    elif message.has_header('Response'):
-                        self.response_queue.put(message)
-                    else:
-                        print 'No clue what we got\n%s' % message.data
+                    #sys.stderr.write('+')
+                    if not self.sock_lock.locked():
+                        raise ManagerException('self.sock_lock is not locked')
+                    if self.sock.fileno() < 0:
+                        raise ManagerSocketException('Connection Terminated')
+                    while 1:
+                        lines = []
+                        while 1:
+                            line = ''
+                            try:
+                                line = self.sockf.readline()
+                                lines.append(line)
+                                if line == EOL:
+                                    break
+                            except IOError:
+                                #continue
+                                if line.find('Asterisk Call Manager') >= 0:
+                                    self.version = line.split('/')[1].strip()
+                                #sys.stderr.write('.')
+                                break
+
+                            sleep(.001)
+                        if lines:
+                            self.message_queue.put(StringIO(''.join(lines)))
+                        else:
+                            break
             finally:
                 #sys.stderr.write('-')
                 self.sock_lock.release()
+
+    def event_loop(self):
+        t = threading.Thread(target=self._receive_data)
+        t.start()
+        try:
+            while 1:
+                #print data.getvalue()
+                data = self.message_queue.get()
+                if not data:
+                    # None so quit
+                    break
+                message = ManagerMsg(data)
+                if message.has_header('Event'):
+                    ev = Event(message)
+                    self.event_queue.put(ev)
+                elif message.has_header('Response'):
+                    self.response_queue.put(message)
+                else:
+                    print 'No clue what we got\n%s' % message.data
+        finally:
+            t.join()
+                            
 
     def event_dispatch(self):
         # event dispatching is serialized in this thread
@@ -231,6 +251,7 @@ class Manager(object):
     def quit(self):
         self.running = 0
 
+        self.message_queue.put(None)
         self.event_queue.put(None)
         for waiter in self.reswaiting:
             self.response_queue.put(None)
@@ -329,3 +350,32 @@ class Manager(object):
 class ManagerException(Exception): pass
 class ManagerSocketException(ManagerException): pass
 
+
+if __name__=='__main__':
+    from pprint import pprint
+    def spew(event):
+        print 'EVENT: ', event.name
+        pprint(event.headers)
+        pprint(event.data)
+
+    Event.register('*',spew)
+
+    mgr = Manager('fred')
+    mess = mgr.connect()
+    pprint(mess.headers)
+    pprint(mess.data)
+    
+    mess = mgr.login('road_rnnr','b33pb33p')
+    pprint(mess.headers)
+    pprint(mess.data)
+
+    try:
+        #raw_input("Press <enter> to exit")
+        while 1:
+            sleep(5)
+            os.system('clear')
+            mess = mgr.status()
+            pprint(mess.headers)
+            pprint(mess.data)
+    finally:
+        mgr.quit()
