@@ -33,13 +33,22 @@ class AGIException(Exception): pass
 
 class AGI:
     def __init__(self):
+        sys.stderr.write('ARGS: ')
+        sys.stderr.write(str(sys.argv))
+        sys.stderr.write('\n')
         self.env = {}
+        self._get_agi_env()
+
+    def _get_agi_env(self):
         while 1:
             line = sys.stdin.readline().strip()
+            sys.stderr.write('ENV LINE: ')
+            sys.stderr.write(line)
+            sys.stderr.write('\n')
             if line == '':
                 #blank line signals end
                 break
-            key,data = line.split(':')
+            key,data = line.split(':')[0], ':'.join(line.split(':')[1:])
             key = key.strip()
             data = data.strip()
             if key <> '':
@@ -47,7 +56,7 @@ class AGI:
         sys.stderr.write('class AGI: self.env = ')
         sys.stderr.write(pprint.pformat(self.env))
         sys.stderr.write('\n')
-
+        
     def execute(self, command, *args):
         try:
             self.send_command(command, *args)
@@ -454,15 +463,17 @@ if __name__=='__main__':
     #agi.hangup()
     #agi.goto_on_exit(extension='1234', priority='1')
     #sys.exit(0)
-    agi.say_digits('123', [4,'5',6])
-    agi.say_digits([4,5,6])
-    agi.say_number('1234')
+    #agi.say_digits('123', [4,'5',6])
+    #agi.say_digits([4,5,6])
+    #agi.say_number('1234')
     #agi.say_number('01234')  # 668
     #agi.say_number('0xf5')   # 245
     agi.get_data('demo-congrats')
+    agi.hangup()
+    sys.exit(0)
     #agi.record_file('pyst-test') #FAILS
-    agi.stream_file('demo-congrats', [1,2,3,4,5,6,7,8,9,0,'#','*'])
-    agi.appexec('background','demo-congrats')
+    #agi.stream_file('demo-congrats', [1,2,3,4,5,6,7,8,9,0,'#','*'])
+    #agi.appexec('background','demo-congrats')
     try:
         agi.appexec('backgrounder','demo-congrats')
     except AGIException:
