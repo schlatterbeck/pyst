@@ -35,8 +35,7 @@ This module provides a Python API for interfacing with the asterisk manager.
    manager.logoff()
    manager.quit()
 
-All actions, events, and responses will be converted to lowercase
-as they are recieved.
+Event names are converted to lowercase.
 
 Not all manager actions are implmented as of yet, feel free to add them
 and submit patches.
@@ -55,7 +54,7 @@ from time import sleep
 EOL = '\r\n'
 
 # how much debugging do we want
-DEBUG = 0
+DEBUG = 4
 
 class ManagerMsg(object): 
     """A manager interface message"""
@@ -70,7 +69,7 @@ class ManagerMsg(object):
         if not self.headers:
             # Bad app not returning any headers.  Let's fake it
             # this could also be the inital greeting
-            self.headers['response'] = 'Generated Header'
+            self.headers['Response'] = 'Generated Header'
             #            'Response:'
 
     def parse(self, response):
@@ -83,7 +82,7 @@ class ManagerMsg(object):
 
         # read the response line by line
         for line in response.readlines():
-            line = line.rstrip().lower()  # strip trailing whitespace and convert to lowercase
+            line = line.rstrip()  # strip trailing whitespace
 
             if not line: continue  # don't process if this is not a message
 
@@ -107,11 +106,11 @@ class ManagerMsg(object):
 
     def has_header(self, hname):
         """Check for a header"""
-        return self.headers.has_key(hname.lower())
+        return self.headers.has_key(hname)
 
     def get_header(self, hname):
         """Return the specfied header"""
-        return self.headers[hname.lower()]
+        return self.headers[hname]
 
 
 class Event(object):
@@ -124,14 +123,14 @@ class Event(object):
         self.headers = message.headers
 
         # if this is not an event message we have a problem
-        if not message.has_header('event'):
+        if not message.has_header('Event'):
             raise ManagerException('Trying to create event from non event message')
 
         # get the event name
-        self.name = message.get_header('event').lower()
+        self.name = message.get_header('Event').lower()
 
     def get_action_id(self):
-        return self.headers.get('actionid',0000)
+        return self.headers.get('ActionID',0000)
 
 
 class Manager(object):
@@ -341,6 +340,7 @@ class Manager(object):
 
         # start a thread to recieve data
         t = threading.Thread(target=self._receive_data)
+        t.setDaemon(True)
         t.start()
 
         try:
@@ -425,10 +425,12 @@ class Manager(object):
 
         # start the event thread
         self.event_thread = t = threading.Thread(target=self.event_loop)
+        t.setDaemon(True)
         t.start()
 
         # start the event dispatching thread
         self.event_dispatch_thread = t = threading.Thread(target=self.event_dispatch)
+        t.setDaemon(True)
         t.start()
 
         # get our inital connection response
@@ -470,8 +472,9 @@ class Manager(object):
         cdict['Secret'] = secret
         response = self.send_action(cdict)
 
-        if response.get_header('response') == 'error':
-           raise ManagerAuthException(response.get_header('message'))
+        if response.get_header('Response') == 'Error':
+           self.quit()  # clean up
+           raise ManagerAuthException(response.get_header('Message'))
         
         return response
 
@@ -491,7 +494,7 @@ class Manager(object):
         cdict = {'Action':'Logoff'}
         response = self.send_action(cdict)
 
-        if response.get_header('response') == 'success':
+        if response.get_header('Response') == 'Success':
             # ok shutdown our connection
             self.running = 0
             self.sock.shutdown(2)
