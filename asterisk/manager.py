@@ -247,7 +247,7 @@ class Manager(object):
                     elif message.has_header('Response'):
                         self.response_queue.put(message)
                     else:
-                        print 'No fucking clue what we got\n%s' % message.data
+                        print 'No clue what we got\n%s' % message.data
             finally:
                 #sys.stderr.write('-')
                 self.sock_lock.release()
