@@ -369,12 +369,12 @@ if __name__=='__main__':
 
     Event.register('*',spew)
 
-    mgr = Manager('206.168.96.110')
+    mgr = Manager('myastbox')
     mess = mgr.connect()
     pprint(mess.headers)
     pprint(mess.data)
     
-    mess = mgr.login('road_rnnr','b33pb33p')
+    mess = mgr.login('username','passwd')
     pprint(mess.headers)
     pprint(mess.data)
 
