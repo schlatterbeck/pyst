@@ -3,7 +3,7 @@
 from distutils.core import setup
 
 setup(name = 'pyst',
-      version = '0.0.4rc10',
+      version = '0.0.4rc11',
       description = 'Asterisk related utility modules.',
       author = 'Karl Putland',
       author_email = 'kputland@users.sourceforge.net',

@@ -296,13 +296,30 @@ class AGI:
             except:
                 raise AGIException('Unable to convert result to char: %s' % res)
 
-    def say_time(self, time, escape_digits=''):
-        """agi.say_time(time_string, escape_digits='') --> digit
+    def say_date(self, seconds, escape_digits=''):
+        """agi.say_date(seconds, escape_digits='') --> digit
+        Say a given date, returning early if any of the given DTMF digits are
+	pressed.  The date should be in seconds since the UNIX Epoch (Jan 1, 1970 00:00:00)
+        """
+        escape_digits = self._process_digit_list(escape_digits)
+        res = self.execute('say date', seconds, escape_digits)['result'][0]
+        if res == '-1':
+            raise AGIException('Channel falure on channel %s' % self.env.get('agi_channel','UNKNOWN'))
+        elif res == '0':
+            return ''
+        else:
+            try:
+                return chr(int(res))
+            except:
+                raise AGIException('Unable to convert result to char: %s' % res)
+
+    def say_time(self, seconds, escape_digits=''):
+        """agi.say_time(seconds, escape_digits='') --> digit
         Say a given time, returning early if any of the given DTMF digits are
 	pressed.  The time should be in seconds since the UNIX Epoch (Jan 1, 1970 00:00:00)
         """
         escape_digits = self._process_digit_list(escape_digits)
-        res = self.execute('say time', time, escape_digits)['result'][0]
+        res = self.execute('say time', seconds, escape_digits)['result'][0]
         if res == '-1':
             raise AGIException('Channel falure on channel %s' % self.env.get('agi_channel','UNKNOWN'))
         elif res == '0':

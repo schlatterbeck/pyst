@@ -1,3 +1,9 @@
+pyst (0.0.4rc11-1) unstable; urgency=low
+
+  * New release.
+
+ -- Matthew A. Nicholson <mnicholson@dhcp-155>  Thu,  3 Feb 2005 18:46:32 -0600
+
 pyst (0.0.4rc10-1) unstable; urgency=low
 
   * Bug fixes in config.py and more docs.
