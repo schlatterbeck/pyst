@@ -308,8 +308,7 @@ class Manager(object):
         cdict['Exten'] = exten
         cdict['Priority'] = priority
         if context:   cdict['Context']  = context
-        if timeout:   cdict['Timeout']  = timeout
-        if caller_id: cdict['CallerID'] = caller_id
+        if extra_channel:   cdict['ExtraChannel']  = extra_channel
         response = self.send_action(cdict)
         return response
 
@@ -369,12 +368,12 @@ if __name__=='__main__':
 
     Event.register('*',spew)
 
-    mgr = Manager('myastbox')
+    mgr = Manager('206.168.96.110')
     mess = mgr.connect()
     pprint(mess.headers)
     pprint(mess.data)
     
-    mess = mgr.login('username','passwd')
+    mess = mgr.login('road_rnnr','b33pb33p')
     pprint(mess.headers)
     pprint(mess.data)
 
