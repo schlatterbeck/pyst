@@ -169,6 +169,13 @@ class Manager(object):
         # sequence stuff
         self._seqlock = threading.Lock()
         self._seq = 0
+       
+        # some threads
+        self.event_thread = threading.Thread(target=self.event_loop)
+        self.event_dispatch_thread = threading.Thread(target=self.event_dispatch)
+        
+        self.event_thread.setDaemon(True)
+        self.event_dispatch_thread.setDaemon(True)
 
 
     #def __del__(self):
@@ -269,11 +276,7 @@ class Manager(object):
                                 self.sock.shutdown(2)
                                 self.sock.close()
                                 self.connected = 0
-                                # put None in the queues to make our threads exit
-                                self.message_queue.put(None)
-                                self.event_queue.put(None)
-                                for waiter in self.reswaiting:
-                                    self.response_queue.put(None)
+                                break
                             
                             if DEBUG > 3:
                                 sys.stderr.write(repr(c))
@@ -304,7 +307,8 @@ class Manager(object):
                             break
 
                         # check to see if this is the greeting line    
-                        if line.find('Asterisk Call Manager') >= 0:
+                        if line.find('/') >= 0 and line.find(':') < 0:
+                            self.title = line.split('/')[0].strip() # store the title of the manager we are connecting to
                             self.version = line.split('/')[1].strip() # store the version of the manager we are connecting to
                             break
 
@@ -312,7 +316,7 @@ class Manager(object):
                             if DEBUG > 2:
                                 sys.stderr.write('.')
 
-                        sleep(.001)  # waste some time before reading another line
+                        #sleep(.001)  # waste some time before reading another line
 
             # just in case there are any problems make sure we handle
             # unlocking and such
@@ -418,8 +422,8 @@ class Manager(object):
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
            self.sock.connect((host,port))
-        except socket.error, reason:
-           raise ManagerSocketException(reason)
+        except socket.error, (errno, reason):
+           raise ManagerSocketException(errno, reason)
 
         # check if we can write to the socket
         rsocks, wsocks, esocks = select([],[self.sock],[],1)
@@ -434,14 +438,10 @@ class Manager(object):
         self.running = 1
 
         # start the event thread
-        self.event_thread = t = threading.Thread(target=self.event_loop)
-        t.setDaemon(True)
-        t.start()
+        self.event_thread.start()
 
         # start the event dispatching thread
-        self.event_dispatch_thread = t = threading.Thread(target=self.event_dispatch)
-        t.setDaemon(True)
-        t.start()
+        self.event_dispatch_thread.start()
 
         # get our inital connection response
         return self.response_queue.get()
@@ -452,20 +452,26 @@ class Manager(object):
         # if we are still running, logout
         if self.running and self.connected:
             self.logoff()
-        elif self.running:
-            self.running = 0
+         
 
-        # put None in the queues to make our threads exit
-        self.message_queue.put(None)
-        self.event_queue.put(None)
-        for waiter in self.reswaiting:
-            self.response_queue.put(None)
+        if self.running:
+            # put None in the queues to make our threads exit
+            self.message_queue.put(None)
+            self.event_queue.put(None)
 
-        # wait for the event thread to exit
-        self.event_thread.join()
+            for waiter in self.reswaiting:
+                self.response_queue.put(None)
 
-        # wait for the dispatch thread to exit
-        self.event_dispatch_thread.join()
+            # wait for the event thread to exit
+            self.event_thread.join()
+
+            # make sure we do not join our self (when quit is called from event handlers)
+            if threading.currentThread() != self.event_dispatch_thread:
+                # wait for the dispatch thread to exit
+                self.event_dispatch_thread.join()
+            
+        self.running = 0
+
 
     def login(self, username='', secret=''):
         """Login to the manager, throws ManagerAuthException when login falis"""

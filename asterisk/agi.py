@@ -296,6 +296,26 @@ class AGI:
             except:
                 raise AGIException('Unable to convert result to char: %s' % res)
 
+    def say_time(self, time, escape_digits=''):
+        """agi.say_time(time_string, escape_digits='') --> digit
+        Say a given time, returning early if any of the given DTMF digits are
+	pressed.  The time should be in seconds since the UNIX Epoch (Jan 1, 1970 00:00:00)
+	the given DTMF digits are received on the channel.  
+        Throws AGIException on channel failure
+        """
+        characters = self._process_digit_list(characters)
+        escape_digits = self._process_digit_list(escape_digits)
+        res = self.execute('say phonetic', characters, escape_digits)['result'][0]
+        if res == '-1':
+            raise AGIException('Channel falure on channel %s' % self.env.get('agi_channel','UNKNOWN'))
+        elif res == '0':
+            return ''
+        else:
+            try:
+                return chr(int(res))
+            except:
+                raise AGIException('Unable to convert result to char: %s' % res)
+
     def get_data(self, filename, timeout=DEFAULT_TIMEOUT, max_digits=255):
         """agi.get_data(filename, timeout=DEFAULT_TIMEOUT, max_digits=255) --> digits
         Stream the given file and receive dialed digits

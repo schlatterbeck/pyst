@@ -1,3 +1,5 @@
+#!/usr/bin/env python
+# vim: set expandtab:
 """
 Parse Asterisk configuration files.
 
@@ -9,8 +11,8 @@ This module provides parsing functionality for asterisk config files.
    # load and parse the config file
    try:
       config = asterisk.config.Config('/etc/asterisk/extensions.conf')
-   except asterisk.config.ParseError, reason:
-      print "Parse Error: %s" % reason
+   except asterisk.config.ParseError, (line, reason):
+      print "Parse Error line: %s: %s" % (line, reason)
       sys.exit(1)
    except IOError, reason:
       print "Error opening file: %s" % reason
@@ -29,10 +31,11 @@ import sys
 class ParseError(Exception): pass
 
 class Line(object):
-    def __init__(self, line):
+    def __init__(self, line, number):
         self.line = ''
         self.comment = ''
         line = line.strip()    # I guess we don't preserve indentation
+	self.number = number
         parts = line.split(';')
         if len(parts) >= 2:
             self.line = parts[0].strip()
@@ -52,12 +55,11 @@ class Line(object):
 
 
 class Category(Line):
-    def __init__(self, line='', name=None):
-        Line.__init__(self, line)
+    def __init__(self, line='', num=-1, name=None):
+        Line.__init__(self, line, num)
         if self.line:
             if (self.line[0] != '[' or self.line[-1] != ']'):
-                sys.stderr.write('Line: %s\n' % self.line)
-                raise ParseError("Missing '[' or ']' in category definition")
+                raise ParseError(self.number,  "Missing '[' or ']' in category definition")
             self.name = self.line[1:-1]
         elif name:
             self.name = name
@@ -86,8 +88,8 @@ class Category(Line):
 
     
 class Item(Line):
-    def __init__(self, line='', name=None, value=None):
-        Line.__init__(self, line)
+    def __init__(self, line='', num=-1, name=None, value=None):
+        Line.__init__(self, line, num)
         self.style = ''
         if self.line:
             self.parse()
@@ -98,7 +100,14 @@ class Item(Line):
             raise Exception("Must provide name or value representing an item")
         
     def parse(self):
-        name, value = self.line.split('=')
+        try:
+            name, value = self.line.split('=', 1)
+        except ValueError:
+            if self.line.strip()[-1] == ']':
+                raise ParseError(self.number, "Category name missing '['")
+            else:
+                raise ParseError(self.number, "Item must be in name = value pairs")
+
         if value and value[0] == '>':
             self.style = '>' #preserve the style of the original
             value = value[1:].strip()
@@ -131,20 +140,22 @@ class Config(object):
 
     def parse(self):
         cat = None
+	num = 0
         for line in self.raw_lines:
+            num += 1
             line = line.strip()
             if not line or line[0] == ';':
-                item = Line(line or '')
+                item = Line(line or '', num)
                 self.lines.append(item)
                 if cat: cat.comments.append(item)
                 continue
             elif line[0] == '[':
-                cat = Category(line)
+                cat = Category(line, num)
                 self.lines.append(cat)
                 self.categories.append(cat)
                 continue
             else:
-                item = Item(line)
+                item = Item(line, num)
                 self.lines.append(item)
                 if cat: cat.append(item)
                 continue
