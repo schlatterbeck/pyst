@@ -1,3 +1,9 @@
+pyst (0.0.4rc7-1) unstable; urgency=low
+
+  * A bunch of fixes to make the manager interface useable
+
+ -- Matthew A. Nicholson <mnicholson@digium.com>  Wed,  5 Jan 2005 19:02:38 -0600
+
 pyst (0.0.4rc6-1) unstable; urgency=low
 
   * Initial Release.

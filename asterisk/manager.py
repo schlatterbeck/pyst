@@ -1,7 +1,45 @@
 #!/usr/bin/env python
+# vim: set expandtab shiftwidth=4:
 
 """
-Interface for Asterisk Manager
+Python Interface for Asterisk Manager
+
+This module provides a Python API for interfacing with the asterisk manager.
+
+   import asterisk.manager
+
+   def handle_shutdown(event, manager):
+      print "Recieved shutdown event"
+      manager.quit()
+      # we could analize the event and reconnect here
+      
+   def handle_event(event, manager):
+      print "Recieved event: %s" % event.name
+   
+   manager = asterisk.manager.Manager()   # optionally pass host to connect to
+   manager.connect('host') 
+   
+   try:
+      manager.login('user', 'secret')
+   except asterisk.manager.ManagerAuthException, reason:
+      print "Error loging in to the manager: %s" % reason
+
+   # register some callbacks
+   manager.register_event('shutdown', handle_shutdown) # shutdown
+   manager.register_event('*', handle_event)           # catch all
+   
+   # get a status report
+   response = manager.status()
+
+   # we are done, peace
+   manager.logoff()
+   manager.quit()
+
+All actions, events, and responses will be converted to lowercase
+as they are recieved.
+
+Not all manager actions are implmented as of yet, feel free to add them
+and submit patches.
 """
 
 import sys,os
@@ -16,110 +54,124 @@ from time import sleep
 
 EOL = '\r\n'
 
+# how much debugging do we want
+DEBUG = 0
+
 class ManagerMsg(object): 
+    """A manager interface message"""
     def __init__(self, response):
-        self.response = response
+        self.response = response  # the raw response, straight from the horse's mouth
         self.data = ''
         self.headers = {}
-        #print response.getvalue()
+        
+        # parse the response
         self.parse(response)
+        
         if not self.headers:
             # Bad app not returning any headers.  Let's fake it
-            self.headers['Response'] = 'Generated Header'
+            # this could also be the inital greeting
+            self.headers['response'] = 'Generated Header'
             #            'Response:'
 
     def parse(self, response):
-        print response.getvalue()
+        """Parse a manager message"""
+        if DEBUG:
+            print response.getvalue()
         response.seek(0)
-        #print response.getvalue()
+
         data = []
+
+        # read the response line by line
         for line in response.readlines():
-            line = line.rstrip()
-            if not line: continue
-            #print 'LINE: %s' % line
+            line = line.rstrip().lower()  # strip trailing whitespace and convert to lowercase
+
+            if not line: continue  # don't process if this is not a message
+
+            # locate the ':' in our message, if there is one
             if line.find(':') > -1:
                 item = [x.strip() for x in line.split(':',1)]
-                #print 'ITEM:', item
+
+                # if this is a header
                 if len(item) == 2:
-                    self.headers[item[0]] = item[1]
+                    # store the header
+                    self.headers[item[0]] = item[1] 
+                # otherwise it is just plain data
                 else:
                     data.append(line)
+            # if there was no ':', then we have data
             else:
                 data.append(line)
+
+        # store the data
         self.data = '%s\n' % '\n'.join(data)
 
     def has_header(self, hname):
-        return self.headers.has_key(hname)
+        """Check for a header"""
+        return self.headers.has_key(hname.lower())
 
     def get_header(self, hname):
-        return self.headers[hname]
+        """Return the specfied header"""
+        return self.headers[hname.lower()]
 
 
 class Event(object):
-    callbacks = {}
-    registerlock = threading.Lock()
+    """Manager interface Events, __init__ expects and 'Event' message"""
     def __init__(self, message):
+
+        # store all of the event data
         self.message = message
         self.data = message.data
         self.headers = message.headers
-        if not message.has_header('Event'):
+
+        # if this is not an event message we have a problem
+        if not message.has_header('event'):
             raise ManagerException('Trying to create event from non event message')
-        self.name = message.get_header('Event')
 
-        # get a copy of current registered callbacks
-        lock = Event.registerlock
-        try:
-            lock.acquire()
-            self.listeners = Event.callbacks.get(self.name,[])[:]
-            self.listeners.extend(Event.callbacks.get('*',[]))
-        finally:
-            if lock.locked():
-                lock.release()
-
-    def dispatch_events(self):
-        for func in self.listeners:
-            func(self)
-    
-    # static method
-    def register(eventname, func):
-        lock = Event.registerlock
-        try:
-            lock.acquire()
-            callbacks = Event.callbacks.get(eventname, [])
-            callbacks.append(func)
-            Event.callbacks[eventname] = callbacks
-        finally:
-            if lock.locked():
-                lock.release()
-    register = staticmethod(register)
+        # get the event name
+        self.name = message.get_header('event').lower()
 
     def get_action_id(self):
-        return self.headers.get('ActionID',0000)
+        return self.headers.get('actionid',0000)
 
 
 class Manager(object):
     #__slots__ = ['host','port','username','secret']
     def __init__(self, host='localhost', port=5038):
+        # the host and port to connect to
         self.host = host
         self.port = port
+
         # sock_lock is used to serialize acces to the socket in the case of us
         # issuing a command and wanting to read the immediate response
         self.sock_lock = threading.Lock()
-        self.sock = None
-        self.sockf = None
-        self.connected = 0
+
+        self.sock = None     # our socket
+        self.connected = 0   # 1 or true when we are connected
+        self.running = 0     # 1 when we are running
+        
+        # our hostname
+        self.hostname = socket.gethostname()
+
+        # our queues
         self.message_queue = Queue.Queue()
         self.response_queue = Queue.Queue()
         self.event_queue = Queue.Queue()
-        self.reswaiting = []
+
+        # callbacks for events
+        self.event_callbacks = {}
+
+        self.reswaiting = []  # who is waiting for a response
+
+        # sequence stuff
         self._seqlock = threading.Lock()
         self._seq = 0
-        self.hostname = socket.gethostname()
+
 
     def __del__(self):
         self.quit()
 
     def next_seq(self):
+        """Return the next number in the sequence, this is used for ActionID"""
         self._seqlock.acquire()
         try:
             return self._seq
@@ -128,189 +180,364 @@ class Manager(object):
             self._seqlock.release()
         
     def send_action(self, cdict={}, **kwargs):
+        """Send a command to the manager"""
+        
+        # fill in our args
         cdict.update(kwargs)
+
+        # set the action id
         cdict['ActionID'] = '%s-%08x' % (self.hostname, self.next_seq())
         clist = []
+
+        # generate the command
         for item in cdict.items():
-            #print item
             item = tuple([str(x) for x in item])
             clist.append('%s: %s' % item)
         clist.append(EOL)
         command = EOL.join(clist)
 
+        # make sure the socket is available for writing
         rsocks, wsocks, esocks = select([],[self.sock],[],60)
+
+        # if our socket is not available for writing, handle it
         if not wsocks:
             raise ManagerSocketException('Communication Problem:  self.sock not ready for writing')
         if self.sock.fileno() < 0:
             raise ManagerSocketException('Connection Terminated')
+
+        # lock the soket and send our command
         try:
             self.sock_lock.acquire()
             self.sock.sendall(command)
         finally:
+            # release the lock
             self.sock_lock.release()
-
+        
         self.reswaiting.insert(0,1)
         response = self.response_queue.get()
         self.reswaiting.pop(0)
         return response
 
     def _receive_data(self):
-        """Read the response from a command.
-           This SHOULD be called from a block that is locked
-           on self.sock_lock
-           self.sock should also be ready for reading
         """
-        while 1:
+        Read the response from a command.
+        This SHOULD be called from a block that is locked
+        on self.sock_lock
+        self.sock should also be ready for reading
+        """
+
+        # loop while we are sill running and connected
+        while self.running and self.connected:
+            
+            # set up for non-blocking action
             rsocks, wsocks, esocks = select([self.sock],[],[],1)
-            if not self.running: break
-            lines = []
+
+            lines = []  # this holds the message
             try:
-                sys.stderr.write('*')
+                if DEBUG > 2:
+                    sys.stderr.write('*')
+
+                # lock our socket
                 self.sock_lock.acquire()
+
+                # if there is data to be read
                 if rsocks:
-                    sys.stderr.write('+')
+                    if DEBUG > 2:  # debug stuff
+                        sys.stderr.write('+')
+
+                    # make sure we are still locked, we should not have to check this
                     if not self.sock_lock.locked():
                         raise ManagerException('self.sock_lock is not locked')
+
+                    # make sure there are no problems with the connection
                     if self.sock.fileno() < 0:
                         raise ManagerSocketException('Connection Terminated')
-                    while 1:
-                        #line = self.sockf.readline()
+
+                    # read a message
+                    while self.connected:
                         line = []
-                        while 1:
+ 
+                        # read a line, one char at a time 
+                        while self.connected:
                             c = self.sock.recv(1)
-                            sys.stderr.write(repr(c))
-                            line.append(c)
+
+                            if not c:  # the other end closed the connection
+                                self.connected = 0
+                                break
+                            
+                            if DEBUG > 3:
+                                sys.stderr.write(repr(c))
+
+                            line.append(c)  # append the character to our line
+
+                            # is this the end of a line?
                             if c == '\n':
-                                sys.stderr.write('\n')
+                                if DEBUG > 3:
+                                    sys.stderr.write('\n')
                                 line = ''.join(line)
                                 break
+
+                        # if we are no longer connected we probably did not
+                        # recieve a full message, don't try to handle it
+                        if not self.connected: break
+
+                        # make sure our line is a string
                         assert type(line) in StringTypes
-                        print line
-                        lines.append(line)
+
+                        if DEBUG:
+                            print line
+
+                        lines.append(line) # add the line to our message
+
+                        # if the line is our EOL marker we have a complete message
                         if line == EOL:
                             break
-                        if line.find('Asterisk Call Manager') >= 0:
-                            self.version = line.split('/')[1].strip()
-                            break
-                            sys.stderr.write('.')
 
-                        sleep(.001)
+                        # check to see if this is the greeting line    
+                        if line.find('Asterisk Call Manager') >= 0:
+                            self.version = line.split('/')[1].strip() # store the version of the manager we are connecting to
+                            break
+
+                            # why is this here
+                            if DEBUG > 2:
+                                sys.stderr.write('.')
+
+                        sleep(.001)  # waste some time before reading another line
+
+            # just in case there are any problems make sure we handle
+            # unlocking and such
             finally:
-                if lines:
+                # if we have a message append it to our queue
+                if lines and self.connected:
                     self.message_queue.put(StringIO(''.join(lines)))
-                sys.stderr.write('-')
+
+                if DEBUG > 2:
+                    sys.stderr.write('-')
+
+                # release our lock, we are done for now
                 self.sock_lock.release()
+    
+    def register_event(self, event, function):
+        """
+        Register a callback for the specfied event.
+        Event names should be in all lowercase.
+        """
+
+        # make the event lowercase
+        event = event.lower()
+        
+        # get the current value, or an empty list
+        # then add our new callback
+        current_callbacks = self.event_callbacks.get(event, [])
+        current_callbacks.append(function)
+        self.event_callbacks[event] = current_callbacks
 
     def event_loop(self):
+        """
+        The method for the event thread.
+        This actually recieves all types of messages and places them
+        in the proper queues.
+        """
+
+        # start a thread to recieve data
         t = threading.Thread(target=self._receive_data)
         t.start()
+
         try:
+            # loop getting messages from the queue
             while 1:
-                #print data.getvalue()
+                # get/wait for messages
                 data = self.message_queue.get()
+
+                # if we got None as our message we are done
                 if not data:
-                    # None so quit
                     break
+
+                # parse the data
                 message = ManagerMsg(data)
+
+                # check if this is an event message
                 if message.has_header('Event'):
-                    ev = Event(message)
-                    self.event_queue.put(ev)
+                    self.event_queue.put(Event(message))
+                # check if this is a response
                 elif message.has_header('Response'):
                     self.response_queue.put(message)
+                # this is an unknown message
                 else:
                     print 'No clue what we got\n%s' % message.data
         finally:
+            # wait for our data receiving thread to exit
             t.join()
                             
 
     def event_dispatch(self):
-        # event dispatching is serialized in this thread
+        """This thread is responsible fore dispatching events"""
+
+        # loop dispatching events
         while 1:
+            # get/wait for an event
             ev = self.event_queue.get()
+
+            # if we got None as an event, we are finished
             if not ev:
-                # None so quit
                 break
-            ev.dispatch_events()
+            
+            # dispatch our events
+
+            # first build a list of the functions to execute
+            callbacks = self.event_callbacks.get(ev.name, [])
+            callbacks.extend(self.event_callbacks.get('*', []))
+
+            # now execute the functions  
+            for callback in callbacks:
+               callback(ev, self)
 
     def connect(self, host='', port=0):
+        """Connect to the manager interface"""
+
+        if self.connected:
+            raise ManagerException('Already connected to manager')
+
+        # set the host and port
         host = host or self.host
         port = port or self.port
+
+        # make sure host is a string
         assert type(host) in StringTypes
-        port = int(port)
+
+        port = int(port)  # make sure port is an int
+
+        # create our socket and connect
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((host,port))
+
+        # check if we can write to the socket
         rsocks, wsocks, esocks = select([],[self.sock],[],1)
         if not wsocks:
             raise ManagerException('Could not establish connection')
-        self.sock.setblocking(1)
+
+        self.sock.setblocking(1)  # make this a blocking socket
         #self.sock.settimeout(.5)
+
+        # we are connected and running
         self.connected = 1
-        # use this for reading only
-        self.sockf = self.sock.makefile()
         self.running = 1
+
+        # start the event thread
         self.event_thread = t = threading.Thread(target=self.event_loop)
         t.start()
+
+        # start the event dispatching thread
         self.event_dispatch_thread = t = threading.Thread(target=self.event_dispatch)
         t.start()
-        # hmmmmmm XXX
+
+        # get our inital connection response
         return self.response_queue.get()
 
     def quit(self):
-        self.running = 0
+        """Shutdown the connection to the manager"""
+        
+        # if we are still running, logout
+        if self.running and self.connected:
+            self.logoff()
+        else:
+            self.running = 0
+            self.sock.shutdown(2)
+            self.sock.close()
+            self.connected = 0
 
+        # put None in the queues to make our threads exit
         self.message_queue.put(None)
         self.event_queue.put(None)
         for waiter in self.reswaiting:
             self.response_queue.put(None)
 
+        # wait for the event thread to exit
         if self.event_thread:
             self.event_thread.join()
 
+        # wait for the dispatch thread to exit
         if self.event_dispatch_thread:
             self.event_dispatch_thread.join()
 
-        self.sock.shutdown(2)
-        self.sock.close()
-
     def login(self, username='', secret=''):
+        """Login to the manager"""
+        if not self.connected:
+            raise ManagerException("Not connected")
+           
         cdict = {'Action':'Login'}
         cdict['Username'] = username
         cdict['Secret'] = secret
         response = self.send_action(cdict)
+
+        if response.get_header('response') == 'error':
+           raise ManagerAuthException(response.get_header('message'))
+        
         return response
 
     def ping(self):
+        """Send a ping action to the manager"""
+        if not self.connected:
+            raise ManagerException("Not connected")
         cdict = {'Action':'Ping'}
         response = self.send_action(cdict)
         return response
 
     def logoff(self):
+        """Logoff from the manager"""
+
+        if not self.connected:
+            raise ManagerException("Not connected")
         cdict = {'Action':'Logoff'}
         response = self.send_action(cdict)
+
+        if response.get_header('response') == 'success':
+            # ok shutdown our connection
+            self.running = 0
+            self.sock.shutdown(2)
+            self.sock.close()
+            self.connected = 0  # _recieve_data should have already done this
+        
         return response
 
     def hangup(self, channel):
+        """Hanup the specfied channel"""
+    
+        if not self.connected:
+            raise ManagerException("Not connected")
         cdict = {'Action':'Hangup'}
         cdict['Channel'] = channel
         response = self.send_action(cdict)
         return response
 
     def status(self):
+        """Get a status message from asterisk"""
+
+        if not self.connected:
+            raise ManagerException("Not connected")
         cdict = {'Action':'Status'}
         response = self.send_action(cdict)
         return response
 
     def redirect(self, channel, exten, priority='1', extra_channel='', context=''):
+        """Redirect a channel"""
+    
+        if not self.connected:
+            raise ManagerException("Not connected")
         cdict = {'Action':'Redirect'}
         cdict['Channel'] = channel
         cdict['Exten'] = exten
         cdict['Priority'] = priority
         if context:   cdict['Context']  = context
-	if extra_channel: cdict['ExtraChannel'] = extra_channel
+        if extra_channel: cdict['ExtraChannel'] = extra_channel
         response = self.send_action(cdict)
         return response
 
     def originate(self, channel, exten, context='', priority='', timeout='', caller_id=''):
+        """Originate a call"""
+
+        if not self.connected:
+            raise ManagerException("Not connected")
         cdict = {'Action':'Originate'}
         cdict['Channel'] = channel
         cdict['Exten'] = exten
@@ -322,18 +549,31 @@ class Manager(object):
         return response
 
     def mailbox_status(self, mailbox):
+        """Get the status of the specfied mailbox"""
+     
+        if not self.connected:
+            raise ManagerException("Not connected")
         cdict = {'Action':'MailboxStatus'}
         cdict['Mailbox'] = mailbox
         response = self.send_action(cdict)
         return response
 
     def command(self, command):
+        """Execute a command"""
+
+        if not self.connected:
+            raise ManagerException("Not connected")
+
         cdict = {'Action':'Command'}
         cdict['Command'] = command
         response = self.send_action(cdict)
         return response
 
     def extension_state(self, exten, context):
+        """Get the state of an extension"""
+
+        if not self.connected:
+            raise ManagerException("Not connected")
         cdict = {'Action':'ExtensionState'}
         cdict['Exten'] = exten
         cdict['Context'] = context
@@ -341,6 +581,10 @@ class Manager(object):
         return response
 
     def absolute_timeout(self, channel, timeout):
+        """Set an absolute timeout on a channel"""
+        
+        if not self.connected:
+            raise ManagerException("Not connected")
         cdict = {'Action':'AbsoluteTimeout'}
         cdict['Channel'] = channel
         cdict['Timeout'] = timeout
@@ -348,6 +592,8 @@ class Manager(object):
         return response
 
     def mailbox_count(self, mailbox):
+        if not self.connected:
+            raise ManagerException("Not connected")
         cdict = {'Action':'MailboxCount'}
         cdict['Mailbox'] = mailbox
         response = self.send_action(cdict)
@@ -355,22 +601,28 @@ class Manager(object):
 
 class ManagerException(Exception): pass
 class ManagerSocketException(ManagerException): pass
+class ManagerAuthException(ManagerException): pass
 
 
 if __name__=='__main__':
     from pprint import pprint
-    def spew(event):
+
+    # our call back function
+    def spew(event, mgr):
         print 'EVENT: ', event.name
         pprint(event.headers)
         pprint(event.data)
 
-    Event.register('*',spew)
-
+    # our manager interface
     mgr = Manager('myastbox')
+    mgr.register_event('*', spew)  # register a catch all event function
+
+    # connect to the manager
     mess = mgr.connect()
     pprint(mess.headers)
     pprint(mess.data)
-    
+   
+    # send our auth data
     mess = mgr.login('username','passwd')
     pprint(mess.headers)
     pprint(mess.data)
