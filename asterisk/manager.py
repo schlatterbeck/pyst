@@ -54,7 +54,7 @@ from time import sleep
 EOL = '\r\n'
 
 # how much debugging do we want
-DEBUG = 4
+DEBUG = 0
 
 class ManagerMsg(object): 
     """A manager interface message"""
@@ -463,7 +463,7 @@ class Manager(object):
             self.event_dispatch_thread.join()
 
     def login(self, username='', secret=''):
-        """Login to the manager"""
+        """Login to the manager, throws ManagerAuthException when login falis"""
         if not self.connected:
             raise ManagerException("Not connected")
            
