@@ -99,7 +99,7 @@ class ManagerMsg(object):
                 # if this is a header
                 if len(item) == 2:
                     # store the header
-                    self.headers[item[0]] = item[1] 
+                    self.headers[item[0]] = item[1]
                 # otherwise it is just plain data
                 else:
                     data.append(line)
@@ -140,6 +140,21 @@ class Event(object):
 
         # get the event name
         self.name = message.get_header('Event')
+    
+    def has_header(self, hname):
+        """Check for a header"""
+        return self.headers.has_key(hname)
+
+    def get_header(self, hname):
+        """Return the specfied header"""
+        return self.headers[hname]
+    
+    def __getitem__(self, hname):
+        """Return the specfied header"""
+        return self.headers[hname]
+    
+    def __repr__(self):
+        return self.headers['Event']
 
     def get_action_id(self):
         return self.headers.get('ActionID',0000)
@@ -158,6 +173,7 @@ class Manager(object):
         self.sock = None     # our socket
         self.connected = 0   # 1 or true when we are connected
         self.running = 0     # 1 when we are running
+        self.logged_in = 0   
         
         # our hostname
         self.hostname = socket.gethostname()
@@ -492,8 +508,8 @@ class Manager(object):
         if not response:
             raise ManagerSocketException("Connection close by remote host")
 
-
         if response.get_header('Response') == 'Error':
+           self.connected = 0  
            self.quit()  # clean up
            raise ManagerAuthException(response.get_header('Message'))
         
@@ -585,7 +601,7 @@ class Manager(object):
         if caller_id: cdict['CallerID'] = caller_id
         if async:     cdict['Async']    = 'yes'
         # join dict of vairables together in a string in the form of 'key=val|key=val'
-        if variables: cdict['Variable'] = '|'.join(['='.join(key, value) for key, value in variables.items()])
+        if variables: cdict['Variable'] = '|'.join(['='.join((key, value)) for key, value in variables.items()])
               
         response = self.send_action(cdict)
         
