@@ -108,9 +108,103 @@ class Manager(object):
         self.response_queue = Queue.Queue()
         self.event_queue = Queue.Queue()
         self.reswaiting = []
+        self._seqlock = threading.Lock()
+        self._seq = 0
+        self.hostname = socket.gethostname()
 
     def __del__(self):
         self.quit()
+
+    def next_seq(self):
+        self._seqlock.acquire()
+        try:
+            return self._seq
+        finally:
+            self._seq += 1
+            self._seqlock.release()
+        
+    def send_action(self, cdict={}, **kwargs):
+        cdict.update(kwargs)
+        cdict['ActionID'] = '%s-%08x' % (self.hostname, self.next_seq())
+        clist = []
+        for item in cdict.items():
+            #print item
+            item = tuple([str(x) for x in item])
+            clist.append('%s: %s' % item)
+        clist.append(EOL)
+        command = EOL.join(clist)
+
+        rsocks, wsocks, esocks = select([],[self.sock],[],60)
+        if not wsocks:
+            raise ManagerSocketException('Communication Problem:  self.sock not ready for writing')
+        if self.sock.fileno() < 0:
+            raise ManagerSocketException('Connection Terminated')
+        try:
+            self.sock_lock.acquire()
+            self.sock.sendall(command)
+        finally:
+            self.sock_lock.release()
+
+        self.reswaiting.insert(0,1)
+        response = self.response_queue.get()
+        self.reswaiting.pop(0)
+        return response
+
+    def _receive_data(self):
+        """Read the response from a command.
+           This SHOULD be called from a block that is locked
+           on self.sock_lock
+           self.sock should also be ready for reading
+        """
+        if not self.sock_lock.locked():
+            raise ManagerException('self.sock_lock is not locked')
+        if self.sock.fileno() < 0:
+            raise ManagerSocketException('Connection Terminated')
+        lines = []
+        while 1:
+            try:
+                line = self.sockf.readline()
+                lines.append(line)
+                if line == EOL:
+                    break
+            except IOError:
+                #continue
+                if line.find('Asterisk Call Manager') >= 0:
+                    self.version = line.split('/')[1].strip()
+                    break
+                #sys.stderr.write('.')
+        return StringIO(''.join(lines))
+
+    def event_loop(self):
+        while 1:
+            rsocks, wsocks, esocks = select([self.sock],[],[],1)
+            if not self.running: break
+            try:
+                #sys.stderr.write('*')
+                self.sock_lock.acquire()
+                if rsocks:
+                    data = self._receive_data()
+                    #print data.getvalue()
+                    message = ManagerMsg(data)
+                    if message.has_header('Event'):
+                        ev = Event(message)
+                        self.event_queue.put(ev)
+                    elif message.has_header('Response'):
+                        self.response_queue.put(message)
+                    else:
+                        print 'No clue what we got\n%s' % message.data
+            finally:
+                #sys.stderr.write('-')
+                self.sock_lock.release()
+
+    def event_dispatch(self):
+        # event dispatching is serialized in this thread
+        while 1:
+            ev = self.event_queue.get()
+            if not ev:
+                # None so quit
+                break
+            ev.dispatch_events()
 
     def connect(self, host='', port=0):
         host = host or self.host
@@ -119,7 +213,7 @@ class Manager(object):
         port = int(port)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.connect((host,port))
-        rsocks, wsocks, esocks = select([],[self.sock],[],60)
+        rsocks, wsocks, esocks = select([],[self.sock],[],1)
         if not wsocks:
             raise ManagerException('Could not establish connection')
         self.sock.setblocking(0)
@@ -150,32 +244,6 @@ class Manager(object):
         self.sock.shutdown(2)
         self.sock.close()
 
-    def send_action(self, cdict={}, **kwargs):
-        cdict.update(kwargs)
-        clist = []
-        for item in cdict.items():
-            #print item
-            item = tuple([str(x) for x in item])
-            clist.append('%s: %s' % item)
-        clist.append(EOL)
-        command = EOL.join(clist)
-
-        rsocks, wsocks, esocks = select([],[self.sock],[],60)
-        if not wsocks:
-            raise ManagerSocketException('Communication Problem:  self.sock not ready for writing')
-        if self.sock.fileno() < 0:
-            raise ManagerSocketException('Connection Terminated')
-        try:
-            self.sock_lock.acquire()
-            self.sock.sendall(command)
-        finally:
-            self.sock_lock.release()
-
-        self.reswaiting.insert(0,1)
-        response = self.response_queue.get()
-        self.reswaiting.pop(0)
-        return response
-
     def login(self, username='', secret=''):
         cdict = {'Action':'Login'}
         cdict['Username'] = username
@@ -183,14 +251,24 @@ class Manager(object):
         response = self.send_action(cdict)
         return response
 
-    def originate(self, channel, exten, context='', priority='', timeout='', caller_id=''):
-        cdict = {'Action':'Originate'}
+    def ping(self):
+        cdict = {'Action':'Ping'}
+        response = self.send_action(cdict)
+        return response
+
+    def logoff(self):
+        cdict = {'Action':'Logoff'}
+        response = self.send_action(cdict)
+        return response
+
+    def hangup(self, channel):
+        cdict = {'Action':'Hangup'}
         cdict['Channel'] = channel
-        cdict['Exten'] = exten
-        if context:   cdict['Context']  = context
-        if priority:  cdict['Priority'] = priority
-        if timeout:   cdict['Timeout']  = timeout
-        if caller_id: cdict['CallerID'] = caller_id
+        response = self.send_action(cdict)
+        return response
+
+    def status(self):
+        cdict = {'Action':'Status'}
         response = self.send_action(cdict)
         return response
 
@@ -205,61 +283,48 @@ class Manager(object):
         response = self.send_action(cdict)
         return response
 
-    def _receive_data(self):
-        """Read the response from a command.
-           This SHOULD be called from a block that is locked
-           on self.sock_lock
-           self.sock should also be ready for reading
-        """
-        if not self.sock_lock.locked():
-            raise ManagerException('self.sock_lock is not locked')
-        if self.sock.fileno() < 0:
-            raise ManagerSocketException('Connection Terminated')
-        lines = []
-        while 1:
-            try:
-                line = self.sockf.readline()
-                lines.append(line)
-                if line == EOL:
-                    break
-            except IOError:
-                #continue
-                if line.find('Asterisk Call Manager') >= 0:
-                    self.version = line.split('/')[1].strip()
-                    break
-                #sys.stderr.write('.')
-        return StringIO(''.join(lines))
+    def originate(self, channel, exten, context='', priority='', timeout='', caller_id=''):
+        cdict = {'Action':'Originate'}
+        cdict['Channel'] = channel
+        cdict['Exten'] = exten
+        if context:   cdict['Context']  = context
+        if priority:  cdict['Priority'] = priority
+        if timeout:   cdict['Timeout']  = timeout
+        if caller_id: cdict['CallerID'] = caller_id
+        response = self.send_action(cdict)
+        return response
 
-    def event_loop(self):
-        while 1:
-            rsocks, wsocks, esocks = select([self.sock],[],[],60)
-            if not self.running: break
-            try:
-                #sys.stderr.write('*')
-                self.sock_lock.acquire()
-                if rsocks:
-                    data = self._receive_data()
-                    #print data.getvalue()
-                    message = ManagerMsg(data)
-                    if message.has_header('Event'):
-                        ev = Event(message)
-                        self.event_queue.put(ev)
-                    elif message.has_header('Response'):
-                        self.response_queue.put(message)
-                    else:
-                        print 'No clue what we got\n%s' % message.data
-            finally:
-                #sys.stderr.write('-')
-                self.sock_lock.release()
+    def mailbox_status(self, mailbox):
+        cdict = {'Action':'MailboxStatus'}
+        cdict['Mailbox'] = mailbox
+        response = self.send_action(cdict)
+        return response
 
-    def event_dispatch(self):
-        # event dispatching is serialized in this thread
-        while 1:
-            ev = self.event_queue.get()
-            if not ev:
-                # None so quit
-                break
-            ev.dispatch_events()
+    def command(self, command):
+        cdict = {'Action':'Command'}
+        cdict['Command'] = command
+        response = self.send_action(cdict)
+        return response
+
+    def extension_state(self, exten, context):
+        cdict = {'Action':'ExtensionState'}
+        cdict['Exten'] = exten
+        cdict['Context'] = context
+        response = self.send_action(cdict)
+        return response
+
+    def absolute_timeout(self, channel, timeout):
+        cdict = {'Action':'AbsoluteTimeout'}
+        cdict['Channel'] = channel
+        cdict['Timeout'] = timeout
+        response = self.send_action(cdict)
+        return response
+
+    def mailbox_count(self, mailbox):
+        cdict = {'Action':'MailboxCount'}
+        cdict['Mailbox'] = mailbox
+        response = self.send_action(cdict)
+        return response
 
 class ManagerException(Exception): pass
 class ManagerSocketException(ManagerException): pass
