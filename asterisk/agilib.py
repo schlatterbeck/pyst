@@ -91,6 +91,11 @@ class AGI:
         if code == 200:
             for key,value,data in re_kv.findall(response):
                 result[key] = (value, data)
+
+                # If user hangs up... we get 'hangup' in the data
+                if data == 'hangup':
+                    AGIException(code, "User hungup during execution")
+
             sys.stderr.write('    RESULT_DICT: %s\n' % pprint.pformat(result))
             return result
         elif code == 510:
@@ -376,7 +381,7 @@ class AGI:
         is set and returns the variable in parenthesis
         example return code: 200 result=1 (testvariable)
         """
-        name = '"%s"' % name
+        name = '%s' % name
         result = self.execute('get variable', name)
         res, value = result['result']
         if res == '0':
