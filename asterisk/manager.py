@@ -59,7 +59,7 @@ class Event(object):
     registerlock = threading.Lock()
     def __init__(self, message):
         self.message = message
-        if not message.has_headder('Event'):
+        if not message.has_header('Event'):
             raise ManagerException('Trying to create event from non event message')
         self.name = message.get_header('Event')
 
