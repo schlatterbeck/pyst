@@ -1,4 +1,11 @@
-pyst (pyst-0.0.4rc9-1) unstable; urgency=low
+pyst (0.0.4rc10-1) unstable; urgency=low
+
+  * Bug fixes in config.py and more docs.
+  * Version number correction.
+
+ -- Matthew A. Nicholson <mnicholson@digium.com>  Tue, 11 Jan 2005 11:30:59 -0600
+
+pyst (0.0.4rc9-1) unstable; urgency=low
 
   * Removed DEBUG flag
 

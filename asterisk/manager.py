@@ -7,6 +7,7 @@ Python Interface for Asterisk Manager
 This module provides a Python API for interfacing with the asterisk manager.
 
    import asterisk.manager
+   import sys
 
    def handle_shutdown(event, manager):
       print "Recieved shutdown event"
@@ -17,12 +18,17 @@ This module provides a Python API for interfacing with the asterisk manager.
       print "Recieved event: %s" % event.name
    
    manager = asterisk.manager.Manager()   # optionally pass host to connect to
-   manager.connect('host') 
    
+   # connect to the manager
    try:
+      manager.connect('host') 
       manager.login('user', 'secret')
+   except asterisk.manager.ManagerSocketException, reason:
+      print "Error connecting to the manager: %s" % reason
+      sys.exit(1)
    except asterisk.manager.ManagerAuthException, reason:
-      print "Error loging in to the manager: %s" % reason
+      print "Error logging in to the manager: %s" % reason
+      sys.exit(1)
 
    # register some callbacks
    manager.register_event('shutdown', handle_shutdown) # shutdown
@@ -35,7 +41,7 @@ This module provides a Python API for interfacing with the asterisk manager.
    manager.logoff()
    manager.quit()
 
-Event names are converted to lowercase.
+Remember all header, response, and event names are case sensitive.
 
 Not all manager actions are implmented as of yet, feel free to add them
 and submit patches.
@@ -127,11 +133,10 @@ class Event(object):
             raise ManagerException('Trying to create event from non event message')
 
         # get the event name
-        self.name = message.get_header('Event').lower()
+        self.name = message.get_header('Event')
 
     def get_action_id(self):
         return self.headers.get('ActionID',0000)
-
 
 class Manager(object):
     #__slots__ = ['host','port','username','secret']
@@ -166,8 +171,8 @@ class Manager(object):
         self._seq = 0
 
 
-    def __del__(self):
-        self.quit()
+    #def __del__(self):
+    #    self.quit()
 
     def next_seq(self):
         """Return the next number in the sequence, this is used for ActionID"""
@@ -261,8 +266,14 @@ class Manager(object):
                             c = self.sock.recv(1)
 
                             if not c:  # the other end closed the connection
+                                self.sock.shutdown(2)
+                                self.sock.close()
                                 self.connected = 0
-                                break
+                                # put None in the queues to make our threads exit
+                                self.message_queue.put(None)
+                                self.event_queue.put(None)
+                                for waiter in self.reswaiting:
+                                    self.response_queue.put(None)
                             
                             if DEBUG > 3:
                                 sys.stderr.write(repr(c))
@@ -319,12 +330,8 @@ class Manager(object):
     def register_event(self, event, function):
         """
         Register a callback for the specfied event.
-        Event names should be in all lowercase.
         """
 
-        # make the event lowercase
-        event = event.lower()
-        
         # get the current value, or an empty list
         # then add our new callback
         current_callbacks = self.event_callbacks.get(event, [])
@@ -345,7 +352,7 @@ class Manager(object):
 
         try:
             # loop getting messages from the queue
-            while 1:
+            while self.running:
                 # get/wait for messages
                 data = self.message_queue.get()
 
@@ -374,7 +381,7 @@ class Manager(object):
         """This thread is responsible fore dispatching events"""
 
         # loop dispatching events
-        while 1:
+        while self.running:
             # get/wait for an event
             ev = self.event_queue.get()
 
@@ -409,7 +416,10 @@ class Manager(object):
 
         # create our socket and connect
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.sock.connect((host,port))
+        try:
+           self.sock.connect((host,port))
+        except socket.error, reason:
+           raise ManagerSocketException(reason)
 
         # check if we can write to the socket
         rsocks, wsocks, esocks = select([],[self.sock],[],1)
@@ -442,11 +452,8 @@ class Manager(object):
         # if we are still running, logout
         if self.running and self.connected:
             self.logoff()
-        else:
+        elif self.running:
             self.running = 0
-            self.sock.shutdown(2)
-            self.sock.close()
-            self.connected = 0
 
         # put None in the queues to make our threads exit
         self.message_queue.put(None)
@@ -455,12 +462,10 @@ class Manager(object):
             self.response_queue.put(None)
 
         # wait for the event thread to exit
-        if self.event_thread:
-            self.event_thread.join()
+        self.event_thread.join()
 
         # wait for the dispatch thread to exit
-        if self.event_dispatch_thread:
-            self.event_dispatch_thread.join()
+        self.event_dispatch_thread.join()
 
     def login(self, username='', secret=''):
         """Login to the manager, throws ManagerAuthException when login falis"""
@@ -471,6 +476,10 @@ class Manager(object):
         cdict['Username'] = username
         cdict['Secret'] = secret
         response = self.send_action(cdict)
+        
+        if not response:
+            raise ManagerSocketException("Connection close by remote host")
+
 
         if response.get_header('Response') == 'Error':
            self.quit()  # clean up
@@ -484,6 +493,10 @@ class Manager(object):
             raise ManagerException("Not connected")
         cdict = {'Action':'Ping'}
         response = self.send_action(cdict)
+
+        if not response:
+            raise ManagerSocketException("Connection close by remote host")
+        
         return response
 
     def logoff(self):
@@ -493,13 +506,10 @@ class Manager(object):
             raise ManagerException("Not connected")
         cdict = {'Action':'Logoff'}
         response = self.send_action(cdict)
-
-        if response.get_header('Response') == 'Success':
-            # ok shutdown our connection
+        
+        # if this is true we were probably successful
+        if not response:
             self.running = 0
-            self.sock.shutdown(2)
-            self.sock.close()
-            self.connected = 0  # _recieve_data should have already done this
         
         return response
 
@@ -511,15 +521,24 @@ class Manager(object):
         cdict = {'Action':'Hangup'}
         cdict['Channel'] = channel
         response = self.send_action(cdict)
+        
+        if not response:
+            raise ManagerSocketException("Connection close by remote host")
+
         return response
 
-    def status(self):
+    def status(self, channel = ''):
         """Get a status message from asterisk"""
 
         if not self.connected:
             raise ManagerException("Not connected")
         cdict = {'Action':'Status'}
+        cdict['Channel'] = channel
         response = self.send_action(cdict)
+        
+        if not response:
+            raise ManagerSocketException("Connection close by remote host")
+
         return response
 
     def redirect(self, channel, exten, priority='1', extra_channel='', context=''):
@@ -534,6 +553,10 @@ class Manager(object):
         if context:   cdict['Context']  = context
         if extra_channel: cdict['ExtraChannel'] = extra_channel
         response = self.send_action(cdict)
+        
+        if not response:
+            raise ManagerSocketException("Connection close by remote host")
+
         return response
 
     def originate(self, channel, exten, context='', priority='', timeout='', caller_id=''):
@@ -549,6 +572,10 @@ class Manager(object):
         if timeout:   cdict['Timeout']  = timeout
         if caller_id: cdict['CallerID'] = caller_id
         response = self.send_action(cdict)
+        
+        if not response:
+            raise ManagerSocketException("Connection close by remote host")
+
         return response
 
     def mailbox_status(self, mailbox):
@@ -559,6 +586,10 @@ class Manager(object):
         cdict = {'Action':'MailboxStatus'}
         cdict['Mailbox'] = mailbox
         response = self.send_action(cdict)
+        
+        if not response:
+            raise ManagerSocketException("Connection close by remote host")
+
         return response
 
     def command(self, command):
@@ -570,6 +601,10 @@ class Manager(object):
         cdict = {'Action':'Command'}
         cdict['Command'] = command
         response = self.send_action(cdict)
+        
+        if not response:
+            raise ManagerSocketException("Connection close by remote host")
+
         return response
 
     def extension_state(self, exten, context):
@@ -581,6 +616,10 @@ class Manager(object):
         cdict['Exten'] = exten
         cdict['Context'] = context
         response = self.send_action(cdict)
+        
+        if not response:
+            raise ManagerSocketException("Connection close by remote host")
+
         return response
 
     def absolute_timeout(self, channel, timeout):
@@ -592,6 +631,10 @@ class Manager(object):
         cdict['Channel'] = channel
         cdict['Timeout'] = timeout
         response = self.send_action(cdict)
+        
+        if not response:
+            raise ManagerSocketException("Connection close by remote host")
+
         return response
 
     def mailbox_count(self, mailbox):
@@ -600,6 +643,10 @@ class Manager(object):
         cdict = {'Action':'MailboxCount'}
         cdict['Mailbox'] = mailbox
         response = self.send_action(cdict)
+        
+        if not response:
+            raise ManagerSocketException("Connection close by remote host")
+
         return response
 
 class ManagerException(Exception): pass
