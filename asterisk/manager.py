@@ -31,7 +31,7 @@ class ManagerMsg(object):
             #            'Response:'
 
     def parse(self, response):
-        #print response.getvalue()
+        print response.getvalue()
         response.seek(0)
         #print response.getvalue()
         data = []
@@ -55,6 +55,7 @@ class ManagerMsg(object):
 
     def get_header(self, hname):
         return self.headers[hname]
+
 
 class Event(object):
     callbacks = {}
@@ -93,6 +94,9 @@ class Event(object):
             if lock.locked():
                 lock.release()
     register = staticmethod(register)
+
+    def get_action_id(self):
+        return self.headers.get('ActionID',0000)
 
 
 class Manager(object):
@@ -161,38 +165,42 @@ class Manager(object):
         while 1:
             rsocks, wsocks, esocks = select([self.sock],[],[],1)
             if not self.running: break
+            lines = []
             try:
-                #sys.stderr.write('*')
+                sys.stderr.write('*')
                 self.sock_lock.acquire()
                 if rsocks:
-                    #sys.stderr.write('+')
+                    sys.stderr.write('+')
                     if not self.sock_lock.locked():
                         raise ManagerException('self.sock_lock is not locked')
                     if self.sock.fileno() < 0:
                         raise ManagerSocketException('Connection Terminated')
                     while 1:
-                        lines = []
+                        #line = self.sockf.readline()
+                        line = []
                         while 1:
-                            line = ''
-                            try:
-                                line = self.sockf.readline()
-                                lines.append(line)
-                                if line == EOL:
-                                    break
-                            except IOError:
-                                #continue
-                                if line.find('Asterisk Call Manager') >= 0:
-                                    self.version = line.split('/')[1].strip()
-                                #sys.stderr.write('.')
+                            c = self.sock.recv(1)
+                            sys.stderr.write(repr(c))
+                            line.append(c)
+                            if c == '\n':
+                                sys.stderr.write('\n')
+                                line = ''.join(line)
                                 break
-
-                            sleep(.001)
-                        if lines:
-                            self.message_queue.put(StringIO(''.join(lines)))
-                        else:
+                        assert type(line) in StringTypes
+                        print line
+                        lines.append(line)
+                        if line == EOL:
                             break
+                        if line.find('Asterisk Call Manager') >= 0:
+                            self.version = line.split('/')[1].strip()
+                            break
+                            sys.stderr.write('.')
+
+                        sleep(.001)
             finally:
-                #sys.stderr.write('-')
+                if lines:
+                    self.message_queue.put(StringIO(''.join(lines)))
+                sys.stderr.write('-')
                 self.sock_lock.release()
 
     def event_loop(self):
@@ -236,7 +244,8 @@ class Manager(object):
         rsocks, wsocks, esocks = select([],[self.sock],[],1)
         if not wsocks:
             raise ManagerException('Could not establish connection')
-        self.sock.setblocking(0)
+        self.sock.setblocking(1)
+        #self.sock.settimeout(.5)
         self.connected = 1
         # use this for reading only
         self.sockf = self.sock.makefile()
@@ -360,7 +369,7 @@ if __name__=='__main__':
 
     Event.register('*',spew)
 
-    mgr = Manager('fred')
+    mgr = Manager('206.168.96.110')
     mess = mgr.connect()
     pprint(mess.headers)
     pprint(mess.data)
