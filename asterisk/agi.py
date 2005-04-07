@@ -329,6 +329,25 @@ class AGI:
                 return chr(int(res))
             except:
                 raise AGIException('Unable to convert result to char: %s' % res)
+    
+    def say_datetime(self, seconds, escape_digits='', format='', zone=''):
+        """agi.say_datetime(seconds, escape_digits='', format='', zone='') --> digit
+	Say a given date in the format specfied (see voicemail.conf), returning
+	early if any of the given DTMF digits are pressed.  The date should be
+	in seconds since the UNIX Epoch (Jan 1, 1970 00:00:00).
+        """
+        escape_digits = self._process_digit_list(escape_digits)
+	if format: format = '"%s"' % format
+        res = self.execute('say datetime', seconds, escape_digits, format, zone)['result'][0]
+        if res == '-1':
+            raise AGIException('Channel falure on channel %s' % self.env.get('agi_channel','UNKNOWN'))
+        elif res == '0':
+            return ''
+        else:
+            try:
+                return chr(int(res))
+            except:
+                raise AGIException('Unable to convert result to char: %s' % res)
 
     def get_data(self, filename, timeout=DEFAULT_TIMEOUT, max_digits=255):
         """agi.get_data(filename, timeout=DEFAULT_TIMEOUT, max_digits=255) --> digits
