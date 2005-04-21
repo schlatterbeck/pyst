@@ -261,7 +261,7 @@ class AGI:
     def say_alpha(self, characters, escape_digits=''):
         """agi.say_alpha(string, escape_digits='') --> digit
         Say a given character string, returning early if any of the given DTMF
-	digits are received on the channel.  
+        digits are received on the channel.  
         Throws AGIException on channel failure
         """
         characters = self._process_digit_list(characters)
@@ -280,7 +280,7 @@ class AGI:
     def say_phonetic(self, characters, escape_digits=''):
         """agi.say_phonetic(string, escape_digits='') --> digit
         Phonetically say a given character string, returning early if any of
-	the given DTMF digits are received on the channel.  
+        the given DTMF digits are received on the channel.  
         Throws AGIException on channel failure
         """
         characters = self._process_digit_list(characters)
@@ -299,7 +299,7 @@ class AGI:
     def say_date(self, seconds, escape_digits=''):
         """agi.say_date(seconds, escape_digits='') --> digit
         Say a given date, returning early if any of the given DTMF digits are
-	pressed.  The date should be in seconds since the UNIX Epoch (Jan 1, 1970 00:00:00)
+        pressed.  The date should be in seconds since the UNIX Epoch (Jan 1, 1970 00:00:00)
         """
         escape_digits = self._process_digit_list(escape_digits)
         res = self.execute('say date', seconds, escape_digits)['result'][0]
@@ -316,7 +316,7 @@ class AGI:
     def say_time(self, seconds, escape_digits=''):
         """agi.say_time(seconds, escape_digits='') --> digit
         Say a given time, returning early if any of the given DTMF digits are
-	pressed.  The time should be in seconds since the UNIX Epoch (Jan 1, 1970 00:00:00)
+        pressed.  The time should be in seconds since the UNIX Epoch (Jan 1, 1970 00:00:00)
         """
         escape_digits = self._process_digit_list(escape_digits)
         res = self.execute('say time', seconds, escape_digits)['result'][0]
@@ -332,12 +332,12 @@ class AGI:
     
     def say_datetime(self, seconds, escape_digits='', format='', zone=''):
         """agi.say_datetime(seconds, escape_digits='', format='', zone='') --> digit
-	Say a given date in the format specfied (see voicemail.conf), returning
-	early if any of the given DTMF digits are pressed.  The date should be
-	in seconds since the UNIX Epoch (Jan 1, 1970 00:00:00).
+        Say a given date in the format specfied (see voicemail.conf), returning
+        early if any of the given DTMF digits are pressed.  The date should be
+        in seconds since the UNIX Epoch (Jan 1, 1970 00:00:00).
         """
         escape_digits = self._process_digit_list(escape_digits)
-	if format: format = '"%s"' % format
+        if format: format = '"%s"' % format
         res = self.execute('say datetime', seconds, escape_digits, format, zone)['result'][0]
         if res == '-1':
             raise AGIException('Channel falure on channel %s' % self.env.get('agi_channel','UNKNOWN'))
@@ -356,6 +356,32 @@ class AGI:
         result = self.execute('get data', filename, timeout, max_digits)
         res, value = result['result']
         return res
+    
+    def get_option(self, filename, escape_digits='', timeout=0):
+        """agi.get_option(filename, escape_digits='', timeout=0) --> digit
+        Send the given file, allowing playback to be interrupted by the given
+        digits, if any.  escape_digits is a string '12345' or a list  of 
+        ints [1,2,3,4,5] or strings ['1','2','3'] or mixed [1,'2',3,'4']
+        Returns  digit if one was pressed.
+        Throws AGIException if the channel was disconnected.  Remember, the file
+        extension must not be included in the filename.
+        """
+        escape_digits = self._process_digit_list(escape_digits)
+        if timeout:
+            response = self.execute('get option', filename, escape_digits, timeout)
+        else:
+            response = self.execute('get option', filename, escape_digits)
+
+        res = response['result'][0]
+        if res == '-1':
+            raise AGIException('Channel falure on channel %s' % self.env.get('agi_channel','UNKNOWN'))
+        elif res == '0':
+            return ''
+        else:
+            try:
+                return chr(int(res))
+            except:
+                raise AGIException('Unable to convert result to char: %s' % res)
 
     def set_context(self, context):
         """agi.set_context(context)
