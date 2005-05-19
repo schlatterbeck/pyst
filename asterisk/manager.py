@@ -171,9 +171,9 @@ class Manager(object):
         self.sock_lock = threading.Lock()
 
         self.sock = None     # our socket
-        self.connected = 0   # 1 or true when we are connected
-        self.running = 0     # 1 when we are running
-        self.logged_in = 0   
+        self.connected = threading.Event()
+        self.running = threading.Event()
+        #self.logged_in = 0   
         
         # our hostname
         self.hostname = socket.gethostname()
@@ -260,7 +260,7 @@ class Manager(object):
         """
 
         # loop while we are sill running and connected
-        while self.running and self.connected:
+        while self.running.isSet() and self.connected.isSet():
             
             # set up for non-blocking action
             rsocks, wsocks, esocks = select([self.sock],[],[],1)
@@ -287,17 +287,17 @@ class Manager(object):
                         raise ManagerSocketException('Connection Terminated')
 
                     # read a message
-                    while self.connected:
+                    while self.connected.isSet():
                         line = []
  
                         # read a line, one char at a time 
-                        while self.connected:
+                        while self.connected.isSet():
                             c = self.sock.recv(1)
 
                             if not c:  # the other end closed the connection
                                 self.sock.shutdown(1)
                                 self.sock.close()
-                                self.connected = 0
+                                self.connected.clear()
                                 break
                             
                             if DEBUG > 3:
@@ -314,7 +314,7 @@ class Manager(object):
 
                         # if we are no longer connected we probably did not
                         # recieve a full message, don't try to handle it
-                        if not self.connected: break
+                        if not self.connected.isSet(): break
 
                         # make sure our line is a string
                         assert type(line) in StringTypes
@@ -344,7 +344,7 @@ class Manager(object):
             # unlocking and such
             finally:
                 # if we have a message append it to our queue
-                if lines and self.connected:
+                if lines and self.connected.isSet():
                     self.message_queue.put(StringIO(''.join(lines)))
 
                 if DEBUG > 2:
@@ -378,7 +378,7 @@ class Manager(object):
 
         try:
             # loop getting messages from the queue
-            while self.running:
+            while self.running.isSet():
                 # get/wait for messages
                 data = self.message_queue.get()
 
@@ -407,7 +407,7 @@ class Manager(object):
         """This thread is responsible fore dispatching events"""
 
         # loop dispatching events
-        while self.running:
+        while self.running.isSet():
             # get/wait for an event
             ev = self.event_queue.get()
 
@@ -428,7 +428,7 @@ class Manager(object):
     def connect(self, host='', port=0):
         """Connect to the manager interface"""
 
-        if self.connected:
+        if self.connected.isSet():
             raise ManagerException('Already connected to manager')
 
         # set the host and port
@@ -456,8 +456,8 @@ class Manager(object):
         #self.sock.settimeout(.5)
 
         # we are connected and running
-        self.connected = 1
-        self.running = 1
+        self.connected.set()
+        self.running.set()
 
         # start the event thread
         self.event_thread.start()
@@ -472,11 +472,11 @@ class Manager(object):
         """Shutdown the connection to the manager"""
         
         # if we are still running, logout
-        if self.running and self.connected:
+        if self.running.isSet() and self.connected.isSet():
             self.logoff()
          
 
-        if self.running:
+        if self.running.isSet():
             # put None in the queues to make our threads exit
             self.message_queue.put(None)
             self.event_queue.put(None)
@@ -492,12 +492,12 @@ class Manager(object):
                 # wait for the dispatch thread to exit
                 self.event_dispatch_thread.join()
             
-        self.running = 0
+        self.running.clear()
 
 
     def login(self, username='', secret=''):
         """Login to the manager, throws ManagerAuthException when login falis"""
-        if not self.connected:
+        if not self.connected.isSet():
             raise ManagerException("Not connected")
            
         cdict = {'Action':'Login'}
@@ -509,7 +509,7 @@ class Manager(object):
             raise ManagerSocketException("Connection close by remote host")
 
         if response.get_header('Response') == 'Error':
-           self.connected = 0  
+           self.connected.clear()
            self.quit()  # clean up
            raise ManagerAuthException(response.get_header('Message'))
         
@@ -517,7 +517,7 @@ class Manager(object):
 
     def ping(self):
         """Send a ping action to the manager"""
-        if not self.connected:
+        if not self.connected.isSet():
             raise ManagerException("Not connected")
         cdict = {'Action':'Ping'}
         response = self.send_action(cdict)
@@ -530,21 +530,21 @@ class Manager(object):
     def logoff(self):
         """Logoff from the manager"""
 
-        if not self.connected:
+        if not self.connected.isSet():
             raise ManagerException("Not connected")
         cdict = {'Action':'Logoff'}
         response = self.send_action(cdict)
         
         # if this is true we were probably successful
         if not response:
-            self.running = 0
+            self.running.clear()
         
         return response
 
     def hangup(self, channel):
         """Hanup the specfied channel"""
     
-        if not self.connected:
+        if not self.connected.isSet():
             raise ManagerException("Not connected")
         cdict = {'Action':'Hangup'}
         cdict['Channel'] = channel
@@ -558,7 +558,7 @@ class Manager(object):
     def status(self, channel = ''):
         """Get a status message from asterisk"""
 
-        if not self.connected:
+        if not self.connected.isSet():
             raise ManagerException("Not connected")
         cdict = {'Action':'Status'}
         cdict['Channel'] = channel
@@ -572,7 +572,7 @@ class Manager(object):
     def redirect(self, channel, exten, priority='1', extra_channel='', context=''):
         """Redirect a channel"""
     
-        if not self.connected:
+        if not self.connected.isSet():
             raise ManagerException("Not connected")
         cdict = {'Action':'Redirect'}
         cdict['Channel'] = channel
@@ -590,7 +590,7 @@ class Manager(object):
     def originate(self, channel, exten, context='', priority='', timeout='', caller_id='', async=False, variables={}):
         """Originate a call"""
 
-        if not self.connected:
+        if not self.connected.isSet():
             raise ManagerException("Not connected")
         cdict = {'Action':'Originate'}
         cdict['Channel'] = channel
@@ -613,7 +613,7 @@ class Manager(object):
     def mailbox_status(self, mailbox):
         """Get the status of the specfied mailbox"""
      
-        if not self.connected:
+        if not self.connected.isSet():
             raise ManagerException("Not connected")
         cdict = {'Action':'MailboxStatus'}
         cdict['Mailbox'] = mailbox
@@ -627,7 +627,7 @@ class Manager(object):
     def command(self, command):
         """Execute a command"""
 
-        if not self.connected:
+        if not self.connected.isSet():
             raise ManagerException("Not connected")
 
         cdict = {'Action':'Command'}
@@ -642,7 +642,7 @@ class Manager(object):
     def extension_state(self, exten, context):
         """Get the state of an extension"""
 
-        if not self.connected:
+        if not self.connected.isSet():
             raise ManagerException("Not connected")
         cdict = {'Action':'ExtensionState'}
         cdict['Exten'] = exten
@@ -657,7 +657,7 @@ class Manager(object):
     def absolute_timeout(self, channel, timeout):
         """Set an absolute timeout on a channel"""
         
-        if not self.connected:
+        if not self.connected.isSet():
             raise ManagerException("Not connected")
         cdict = {'Action':'AbsoluteTimeout'}
         cdict['Channel'] = channel
@@ -670,7 +670,7 @@ class Manager(object):
         return response
 
     def mailbox_count(self, mailbox):
-        if not self.connected:
+        if not self.connected.isSet():
             raise ManagerException("Not connected")
         cdict = {'Action':'MailboxCount'}
         cdict['Mailbox'] = mailbox
