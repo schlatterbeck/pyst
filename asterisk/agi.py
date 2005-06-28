@@ -34,11 +34,12 @@ class AGIError(AGIException): pass
 
 class AGIUnknownError(AGIError): pass
 
-class AGIHangup(AGIError): pass
 class AGIAppError(AGIError): pass
+class AGIHangup(AGIAppError): pass
+class AGIDBError(AGIAppError): pass
 
 class AGIUsageError(AGIError): pass
-class AGIBadCommand(AGIError): pass
+class AGIInvalidCommand(AGIError): pass
 
 class AGI:
     def __init__(self):
@@ -114,7 +115,7 @@ class AGI:
             sys.stderr.write('    RESULT_DICT: %s\n' % pprint.pformat(result))
             return result
         elif code == 510:
-            raise AGIBadCommand(response)
+            raise AGIInvalidCommand(response)
         elif code == 520:
             usage = [line]
             line = stdin.readline().strip()
@@ -427,8 +428,8 @@ class AGI:
         """
         self.execute('HANGUP', channel)
 
-    def exec_app(self, application, options=''):
-        """agi.exec(application, options='')
+    def appexec(self, application, options=''):
+        """agi.appexec(application, options='')
         Executes <application> with given <options>.
         Returns whatever the application returns, or -2 on failure to find
         application
@@ -460,7 +461,10 @@ class AGI:
         6 Line is up
         7 Line is busy
         """
-        result = self.execute('CHANNEL STATUS', channel)[0]
+        try:
+           result = self.execute('CHANNEL STATUS', channel)[0]
+        except AGIHangup:
+           result = {'result': '-1'}
         return int(result['result'])
 
     def set_variable(self, name, value):
@@ -500,7 +504,7 @@ class AGI:
         result = self.execute('DATABASE GET', self._quote(family), self._quote(key))
         res, value = result['result']
         if res == '0':
-            raise AGIAppError('Key not found in database: family=%s, key=%s' % (family, key))
+            raise AGIDBError('Key not found in database: family=%s, key=%s' % (family, key))
         elif res == '1':
             return value
         else:
@@ -514,7 +518,7 @@ class AGI:
         result = self.execute('DATABASE PUT', self._quote(family), self._quote(key), self._quote(value))
         res, value = result['result']
         if res == '0':
-            raise AGIAppError('Unable to put vaule in databale: family=%s, key=%s, value=%s' % (family, key, value))
+            raise AGIDBError('Unable to put vaule in databale: family=%s, key=%s, value=%s' % (family, key, value))
             
     def database_del(self, family, key):
         """agi.database_del(family, key) --> None
@@ -524,7 +528,7 @@ class AGI:
         result = self.execute('DATABASE DEL', self._quote(family), self._quote(key))
         res, value = result['result']
         if res == '0':
-            raise AGIAppError('Unable to delete from database: family=%s, key=%s' % (family, key))
+            raise AGIDBError('Unable to delete from database: family=%s, key=%s' % (family, key))
 
     def database_deltree(self, family, key=''):
         """agi.database_deltree(family, key='') --> None
@@ -534,7 +538,7 @@ class AGI:
         result = self.execute('DATABASE DELTREE', self._quote(family), self._quote(key))
         res, value = result['result']
         if res == '0':
-            raise AGIAppError('Unable to delete tree from database: family=%s, key=%s' % (family, key))
+            raise AGIDBError('Unable to delete tree from database: family=%s, key=%s' % (family, key))
 
     def noop(self):
         """agi.noop() --> None
@@ -544,10 +548,10 @@ class AGI:
 
 if __name__=='__main__':
     agi = AGI()
-    #agi.exec_app('festival','Welcome to Klass Technologies.  Thank you for calling.')
-    #agi.exec_app('festival','This is a test of the text to speech engine.')
-    #agi.exec_app('festival','Press 1 for sales ')
-    #agi.exec_app('festival','Press 2 for customer support ')
+    #agi.appexec('festival','Welcome to Klass Technologies.  Thank you for calling.')
+    #agi.appexec('festival','This is a test of the text to speech engine.')
+    #agi.appexec('festival','Press 1 for sales ')
+    #agi.appexec('festival','Press 2 for customer support ')
     #agi.hangup()
     #agi.goto_on_exit(extension='1234', priority='1')
     #sys.exit(0)
@@ -561,27 +565,32 @@ if __name__=='__main__':
     sys.exit(0)
     #agi.record_file('pyst-test') #FAILS
     #agi.stream_file('demo-congrats', [1,2,3,4,5,6,7,8,9,0,'#','*'])
-    #agi.exec_app('background','demo-congrats')
+    #agi.appexec('background','demo-congrats')
+
     try:
-        agi.exec_app('backgrounder','demo-congrats')
+        agi.appexec('backgrounder','demo-congrats')
     except AGIAppError:
         sys.stderr.write("Handled exception for missing application backgrounder\n")
+
     agi.set_variable('foo','bar')
     agi.get_variable('foo')
+
     try:
         agi.get_variable('foobar')
     except AGIAppError:
         sys.stderr.write("Handled exception for missing variable foobar\n")
-    agi.database_put('foo', 'bar', 'foobar')
-    agi.database_put('foo', 'baz', 'foobaz')
-    agi.database_put('foo', 'bat', 'foobat')
-    v = agi.database_get('foo', 'bar')
-    sys.stderr.write('DBVALUE foo:bar = %s\n' % v)
+
     try:
+        agi.database_put('foo', 'bar', 'foobar')
+        agi.database_put('foo', 'baz', 'foobaz')
+        agi.database_put('foo', 'bat', 'foobat')
+        v = agi.database_get('foo', 'bar')
+        sys.stderr.write('DBVALUE foo:bar = %s\n' % v)
         v = agi.database_get('bar', 'foo')
         sys.stderr.write('DBVALUE foo:bar = %s\n' % v)
-    except AGIAppError:
+        agi.database_del('foo', 'bar')
+        agi.database_deltree('foo')
+    except AGIDBError:
         sys.stderr.write("Handled exception for missing database entry bar:foo\n")
-    agi.database_del('foo', 'bar')
-    agi.database_deltree('foo')
+
     agi.hangup()
