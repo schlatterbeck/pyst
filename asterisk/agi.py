@@ -109,7 +109,7 @@ class AGI:
                 if data == 'hangup':
                     raise AGIHangup("User hungup during execution")
 
-                if value == '-1':
+                if key == 'result' and value == '-1':
                     raise AGIAppError("Error executing application, or hangup")
 
             sys.stderr.write('    RESULT_DICT: %s\n' % pprint.pformat(result))
@@ -143,7 +143,6 @@ class AGI:
         """agi.wait_for_digit(timeout=DEFAULT_TIMEOUT) --> digit
         Waits for up to 'timeout' milliseconds for a channel to receive a DTMF digit.
         Returns digit dialed
-        Throws AGITimeout if no digit entered
         Throws AGIError on channel falure
         """
         res = self.execute('WAIT FOR DIGIT', timeout)['result'][0]
@@ -182,7 +181,7 @@ class AGI:
     def tdd_mode(self, mode='off'):
         """agi.tdd_mode(mode='on'|'off') --> None
         Enable/Disable TDD transmission/reception on a channel. 
-        Throws AGIError if channel is not TDD-capable.
+        Throws AGIAppError if channel is not TDD-capable.
         """
         res = self.execute('TDD MODE', mode)['result'][0]
         if res == '0':

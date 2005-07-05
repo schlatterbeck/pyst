@@ -356,6 +356,8 @@ class Manager(object):
     def register_event(self, event, function):
         """
         Register a callback for the specfied event.
+        If a callback function returns True, no more callbacks for that
+        event will be executed.
         """
 
         # get the current value, or an empty list
@@ -423,7 +425,8 @@ class Manager(object):
 
             # now execute the functions  
             for callback in callbacks:
-               callback(ev, self)
+               if callback(ev, self):
+                  break
 
     def connect(self, host='', port=0):
         """Connect to the manager interface"""
@@ -601,7 +604,7 @@ class Manager(object):
         if caller_id: cdict['CallerID'] = caller_id
         if async:     cdict['Async']    = 'yes'
         # join dict of vairables together in a string in the form of 'key=val|key=val'
-        if variables: cdict['Variable'] = '|'.join(['='.join((key, value)) for key, value in variables.items()])
+        if variables: cdict['Variable'] = '|'.join(['='.join((str(key), str(value))) for key, value in variables.items()])
               
         response = self.send_action(cdict)
         
