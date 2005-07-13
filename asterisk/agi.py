@@ -207,6 +207,27 @@ class AGI:
                 return chr(int(res))
             except:
                 raise AGIError('Unable to convert result to char: %s' % res)
+    
+    def control_stream_file(self, filename, escape_digits='', skipms='', fwd='', rew='', pause=''):
+        """
+        Send the given file, allowing playback to be interrupted by the given
+        digits, if any.  escape_digits is a string '12345' or a list  of 
+        ints [1,2,3,4,5] or strings ['1','2','3'] or mixed [1,'2',3,'4']
+        If sample offset is provided then the audio will seek to sample
+        offset before play starts.  Returns  digit if one was pressed.
+        Throws AGIError if the channel was disconnected.  Remember, the file
+        extension must not be included in the filename.
+        """
+        escape_digits = self._process_digit_list(escape_digits)
+        response = self.execute('CONTROL STREAM FILE', filename, escape_digits, skipms, fwd, rew, pause)
+        res = response['result'][0]
+        if res == '0':
+            return ''
+        else:
+            try:
+                return chr(int(res))
+            except:
+                raise AGIError('Unable to convert result to char: %s' % res)
 
     def send_image(self, filename):
         """agi.send_image(filename) --> None
