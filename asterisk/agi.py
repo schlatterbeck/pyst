@@ -2,8 +2,7 @@
 # vim: set et sw=4:
 """agi
 
-A module for asterisk AGI programming
-
+This module contains functions and classes to implment AGI scripts in python.
 pyvr
 
 {'agi_callerid' : 'mars.putland.int',
@@ -22,6 +21,7 @@ pyvr
 
 import sys, pprint, re
 from types import ListType
+import signal
 
 DEFAULT_TIMEOUT = 2000 # 2sec timeout used as default for functions that take timeouts
 DEFAULT_RECORD  = 20000 # 20sec record time
@@ -42,7 +42,15 @@ class AGIUsageError(AGIError): pass
 class AGIInvalidCommand(AGIError): pass
 
 class AGI:
+    """
+    This class encapsulates communication between Asterisk an a python script.
+    It handles encoding commands to Asterisk and parsing responses from
+    Asterisk. 
+    """
+    
     def __init__(self):
+        self._got_sighup = False
+        signal.signal(signal.SIGHUP, self._handle_sighup)  # handle SIGHUP
         sys.stderr.write('ARGS: ')
         sys.stderr.write(str(sys.argv))
         sys.stderr.write('\n')
@@ -69,8 +77,19 @@ class AGI:
 
     def _quote(self, string):
         return ''.join(['"', str(string), '"'])
+
+    def _handle_sighup(self, signum, frame):
+        """Handle the SIGHUP signal"""
+        self._got_sighup = True
+
+    def test_hangup(self):
+        """This function throws AGIHangup if we have recieved a SIGHUP"""
+        if self._got_sighup:
+           raise AGIHangup("Received SIGHUP from Asterisk")
         
     def execute(self, command, *args):
+        self.test_hangup()
+
         try:
             self.send_command(command, *args)
             return self.get_result()
@@ -82,6 +101,7 @@ class AGI:
                 raise
 
     def send_command(self, command, *args):
+        """Send a command to Asterisk"""
         command = command.strip()
         command = '%s %s' % (command, ' '.join(map(str,args)))
         command = command.strip()
@@ -92,6 +112,7 @@ class AGI:
         sys.stdout.flush()
 
     def get_result(self, stdin=sys.stdin):
+        """Read the result of a command from Asterisk"""
         code = 0
         result = {'result':('','')}
         line = stdin.readline().strip()
@@ -141,8 +162,8 @@ class AGI:
 
     def wait_for_digit(self, timeout=DEFAULT_TIMEOUT):
         """agi.wait_for_digit(timeout=DEFAULT_TIMEOUT) --> digit
-        Waits for up to 'timeout' milliseconds for a channel to receive a DTMF digit.
-        Returns digit dialed
+        Waits for up to 'timeout' milliseconds for a channel to receive a DTMF
+        digit.  Returns digit dialed
         Throws AGIError on channel falure
         """
         res = self.execute('WAIT FOR DIGIT', timeout)['result'][0]
