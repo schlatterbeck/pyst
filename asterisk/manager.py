@@ -590,7 +590,7 @@ class Manager(object):
 
         return response
 
-    def originate(self, channel, exten, context='', priority='', timeout='', caller_id='', async=False, variables={}):
+    def originate(self, channel, exten, context='', priority='', timeout='', caller_id='', async=False, account='', variables={}):
         """Originate a call"""
 
         if not self.connected.isSet():
@@ -603,6 +603,7 @@ class Manager(object):
         if timeout:   cdict['Timeout']  = timeout
         if caller_id: cdict['CallerID'] = caller_id
         if async:     cdict['Async']    = 'yes'
+        if account:   cdict['Account']  = account
         # join dict of vairables together in a string in the form of 'key=val|key=val'
         if variables: cdict['Variable'] = '|'.join(['='.join((str(key), str(value))) for key, value in variables.items()])
               
