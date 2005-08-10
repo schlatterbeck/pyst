@@ -213,7 +213,22 @@ class Manager(object):
             self._seqlock.release()
         
     def send_action(self, cdict={}, **kwargs):
-        """Send a command to the manager"""
+        """
+        Send a command to the manager
+        
+        If a list is passed to the cdict argument, each item in the list will
+        be sent to asterisk under the same header in the following manner:
+
+        cdict = {"Action": "Originate",
+                 "Variable": ["var1=value", "var2=value"]}
+        send_action(cdict)
+
+        ...
+
+        Action: Originate
+        Variable: var1=value
+        Variable: var2=value
+        """
         
         # fill in our args
         cdict.update(kwargs)
@@ -223,9 +238,14 @@ class Manager(object):
         clist = []
 
         # generate the command
-        for item in cdict.items():
-            item = tuple([str(x) for x in item])
-            clist.append('%s: %s' % item)
+        for key, value in cdict.items():
+            if isinstance(value, list):
+               for item in value:
+                  item = tuple([key, item])
+                  clist.append('%s: %s' % item)
+            else:
+               item = tuple([key, value])
+               clist.append('%s: %s' % item)
         clist.append(EOL)
         command = EOL.join(clist)
 
@@ -605,7 +625,9 @@ class Manager(object):
         if async:     cdict['Async']    = 'yes'
         if account:   cdict['Account']  = account
         # join dict of vairables together in a string in the form of 'key=val|key=val'
-        if variables: cdict['Variable'] = '|'.join(['='.join((str(key), str(value))) for key, value in variables.items()])
+        # with the latest CVS HEAD this is no longer necessary
+        # if variables: cdict['Variable'] = '|'.join(['='.join((str(key), str(value))) for key, value in variables.items()])
+        if variables: cdict['Variable'] = ['='.join((str(key), str(value))) for key, value in variables.items()]
               
         response = self.send_action(cdict)
         
