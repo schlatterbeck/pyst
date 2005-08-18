@@ -35,7 +35,14 @@ class AGIError(AGIException): pass
 class AGIUnknownError(AGIError): pass
 
 class AGIAppError(AGIError): pass
+
+# there are several different types of hangups we can detect
+# they all are derrived from AGIHangup
 class AGIHangup(AGIAppError): pass
+class AGISIGHUPHangup(AGIHangup): pass
+class AGISIGPIPEHangup(AGIHangup): pass
+class AGIResultHangup(AGIHangup): pass
+
 class AGIDBError(AGIAppError): pass
 
 class AGIUsageError(AGIError): pass
@@ -85,7 +92,7 @@ class AGI:
     def test_hangup(self):
         """This function throws AGIHangup if we have recieved a SIGHUP"""
         if self._got_sighup:
-           raise AGIHangup("Received SIGHUP from Asterisk")
+           raise AGISIGHUPHangup("Received SIGHUP from Asterisk")
         
     def execute(self, command, *args):
         self.test_hangup()
@@ -96,7 +103,7 @@ class AGI:
         except IOError,e:
             if e.errno == 32:
                 # Broken Pipe * let us go
-                sys.exit(1)
+                raise AGISIGPIPEHangup("Received SIGPIPE")
             else:
                 raise
 
@@ -128,7 +135,7 @@ class AGI:
 
                 # If user hangs up... we get 'hangup' in the data
                 if data == 'hangup':
-                    raise AGIHangup("User hungup during execution")
+                    raise AGIResultHangup("User hungup during execution")
 
                 if key == 'result' and value == '-1':
                     raise AGIAppError("Error executing application, or hangup")
@@ -503,10 +510,13 @@ class AGI:
         7 Line is busy
         """
         try:
-           result = self.execute('CHANNEL STATUS', channel)[0]
+           result = self.execute('CHANNEL STATUS', channel)
         except AGIHangup:
-           result = {'result': '-1'}
-        return int(result['result'])
+           raise
+        except AGIAppError:
+           result = {'result': ('-1','')}
+
+        return int(result['result'][0])
 
     def set_variable(self, name, value):
         """agi.set_variable(name, value) --> None
@@ -519,7 +529,11 @@ class AGI:
         is set and returns the variable in parenthesis
         example return code: 200 result=1 (testvariable)
         """
-        result = self.execute('GET VARIABLE', self._quote(name))
+        try:
+           result = self.execute('GET VARIABLE', self._quote(name))
+        except AGIResultHangup:
+           result = {'result': ('1', 'hangup')}
+
         res, value = result['result']
         if res == '0':
             raise AGIAppError("Variable %s is not set" % name)
