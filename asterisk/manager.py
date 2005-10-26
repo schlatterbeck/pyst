@@ -31,7 +31,7 @@ This module provides a Python API for interfacing with the asterisk manager.
       sys.exit(1)
 
    # register some callbacks
-   manager.register_event('shutdown', handle_shutdown) # shutdown
+   manager.register_event('Shutdown', handle_shutdown) # shutdown
    manager.register_event('*', handle_event)           # catch all
    
    # get a status report
