@@ -27,7 +27,7 @@ DEFAULT_TIMEOUT = 2000 # 2sec timeout used as default for functions that take ti
 DEFAULT_RECORD  = 20000 # 20sec record time
 
 re_code = re.compile(r'(^\d*)\s*(.*)')
-re_kv = re.compile(r'(?P<key>\w+)=(?P<value>[\w-]+)\s*(?:\((?P<data>.*)\))*')
+re_kv = re.compile(r'(?P<key>\w+)=(?P<value>[^\s]+)\s*(?:\((?P<data>.*)\))*')
 
 class AGIException(Exception): pass
 class AGIError(AGIException): pass
