@@ -1,6 +1,6 @@
 Summary: An interface to AGI
 Name: python-pyst
-Version: 0.0.4rc12
+Version: 0.0.4rc13
 Release: 2.centos4.0
 Source0: http://prdownloads.sourceforge.net/pyst/pyst-%{version}.tar.gz
 License: LGPL
@@ -37,6 +37,9 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/python*/site-packages/asterisk/
 
 %changelog
+* Tue Mar 21 2006 Matthew A. Nicholson <mnicholson@digium.com> el4.3
+- Bumped version number.
+
 * Thu Feb 23 2006 Antoine Brenner <http://www.gymglish.com> el4.2
 - Fixed source0 line
 
