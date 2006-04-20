@@ -4,5 +4,5 @@ include debian/changelog
 include debian/control
 include debian/compat
 include debian/copyright
-include rmps/python-pyst.spec
+include rpm/python-pyst.spec
 include MANIFEST.in
