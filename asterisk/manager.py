@@ -17,29 +17,34 @@ This module provides a Python API for interfacing with the asterisk manager.
    def handle_event(event, manager):
       print "Recieved event: %s" % event.name
    
-   manager = asterisk.manager.Manager()   # optionally pass host to connect to
-   
-   # connect to the manager
+   manager = asterisk.manager.Manager()
    try:
-      manager.connect('host') 
-      manager.login('user', 'secret')
-   except asterisk.manager.ManagerSocketException, reason:
-      print "Error connecting to the manager: %s" % reason
-      sys.exit(1)
-   except asterisk.manager.ManagerAuthException, reason:
-      print "Error logging in to the manager: %s" % reason
-      sys.exit(1)
+       # connect to the manager
+       try:
+          manager.connect('host') 
+          manager.login('user', 'secret')
 
-   # register some callbacks
-   manager.register_event('Shutdown', handle_shutdown) # shutdown
-   manager.register_event('*', handle_event)           # catch all
-   
-   # get a status report
-   response = manager.status()
+           # register some callbacks
+           manager.register_event('Shutdown', handle_shutdown) # shutdown
+           manager.register_event('*', handle_event)           # catch all
+           
+           # get a status report
+           response = manager.status()
 
-   # we are done, peace
-   manager.logoff()
-   manager.quit()
+           manager.logoff()
+       except asterisk.manager.ManagerSocketException, (errno, reason):
+          print "Error connecting to the manager: %s" % reason
+          sys.exit(1)
+       except asterisk.manager.ManagerAuthException, reason:
+          print "Error logging in to the manager: %s" % reason
+          sys.exit(1)
+       except asterisk.manager.ManagerException, reason:
+          print "Error: %s" % reason
+          sys.exit(1)
+          
+   finally:
+      # remember to clean up
+      manager.quit()
 
 Remember all header, response, and event names are case sensitive.
 
@@ -59,9 +64,6 @@ from time import sleep
 
 EOL = '\r\n'
 
-# how much debugging do we want
-DEBUG = 0
-
 class ManagerMsg(object): 
     """A manager interface message"""
     def __init__(self, response):
@@ -80,8 +82,6 @@ class ManagerMsg(object):
 
     def parse(self, response):
         """Parse a manager message"""
-        if DEBUG:
-            print response.getvalue()
         response.seek(0)
 
         data = []
@@ -160,33 +160,27 @@ class Event(object):
         return self.headers.get('ActionID',0000)
 
 class Manager(object):
-    #__slots__ = ['host','port','username','secret']
-    def __init__(self, host='localhost', port=5038):
-        # the host and port to connect to
-        self.host = host
-        self.port = port
-
-        # sock_lock is used to serialize acces to the socket in the case of us
+    def __init__(self):
+        # _sock_lock is used to serialize acces to the socket in the case of us
         # issuing a command and wanting to read the immediate response
-        self.sock_lock = threading.Lock()
+        self._sock_lock = threading.Lock()
 
-        self.sock = None     # our socket
-        self.connected = threading.Event()
-        self.running = threading.Event()
-        #self.logged_in = 0   
+        self._sock = None     # our socket
+        self._connected = threading.Event()
+        self._running = threading.Event()
         
         # our hostname
         self.hostname = socket.gethostname()
 
         # our queues
-        self.message_queue = Queue.Queue()
-        self.response_queue = Queue.Queue()
-        self.event_queue = Queue.Queue()
+        self._message_queue = Queue.Queue()
+        self._response_queue = Queue.Queue()
+        self._event_queue = Queue.Queue()
 
         # callbacks for events
-        self.event_callbacks = {}
+        self._event_callbacks = {}
 
-        self.reswaiting = []  # who is waiting for a response
+        self._reswaiting = []  # who is waiting for a response
 
         # sequence stuff
         self._seqlock = threading.Lock()
@@ -202,6 +196,12 @@ class Manager(object):
 
     #def __del__(self):
     #    self.quit()
+
+    def connected():
+        """
+        Check if we are connected or not.
+        """
+        return self._connected.isSet()
 
     def next_seq(self):
         """Return the next number in the sequence, this is used for ActionID"""
@@ -229,6 +229,9 @@ class Manager(object):
         Variable: var1=value
         Variable: var2=value
         """
+
+        if not self._connected.isSet():
+            raise ManagerException("Not connected")
         
         # fill in our args
         cdict.update(kwargs)
@@ -250,128 +253,113 @@ class Manager(object):
         command = EOL.join(clist)
 
         # make sure the socket is available for writing
-        rsocks, wsocks, esocks = select([],[self.sock],[],60)
+        rsocks, wsocks, esocks = select([],[self._sock],[],60)
 
         # if our socket is not available for writing, handle it
         if not wsocks:
-            raise ManagerSocketException('Communication Problem:  self.sock not ready for writing')
-        if self.sock.fileno() < 0:
+            raise ManagerSocketException('Communication Problem:  self._sock not ready for writing')
+        if self._sock.fileno() < 0:
             raise ManagerSocketException('Connection Terminated')
 
         # lock the soket and send our command
         try:
-            self.sock_lock.acquire()
-            self.sock.sendall(command)
+            self._sock_lock.acquire()
+            self._sock.sendall(command)
         finally:
             # release the lock
-            self.sock_lock.release()
+            self._sock_lock.release()
         
-        self.reswaiting.insert(0,1)
-        response = self.response_queue.get()
-        self.reswaiting.pop(0)
+        self._reswaiting.insert(0,1)
+        response = self._response_queue.get()
+        self._reswaiting.pop(0)
+
         return response
 
     def _receive_data(self):
         """
         Read the response from a command.
         This SHOULD be called from a block that is locked
-        on self.sock_lock
-        self.sock should also be ready for reading
+        on self._sock_lock
+        self._sock should also be ready for reading
         """
 
         # loop while we are sill running and connected
-        while self.running.isSet() and self.connected.isSet():
+        while self._running.isSet() and self._connected.isSet():
             
             # set up for non-blocking action
-            rsocks, wsocks, esocks = select([self.sock],[],[],1)
+            rsocks, wsocks, esocks = select([self._sock],[],[],1)
 
-            lines = []  # this holds the message
+            lines = []
+
+            self._sock_lock.acquire()
             try:
-                if DEBUG > 2:
-                    sys.stderr.write('*')
+                try:
+                    # if there is data to be read
+                    if rsocks:
+                        # make sure we are still locked, we should not have to check this
+                        if not self._sock_lock.locked():
+                            raise ManagerException('self._sock_lock is not locked')
 
-                # lock our socket
-                self.sock_lock.acquire()
+                        # make sure there are no problems with the connection
+                        if self._sock.fileno() < 0:
+                            raise ManagerSocketException('Connection Terminated')
 
-                # if there is data to be read
-                if rsocks:
-                    if DEBUG > 2:  # debug stuff
-                        sys.stderr.write('+')
+                        # read a message
+                        while self._connected.isSet():
+                            line = []
+     
+                            # read a line, one char at a time 
+                            while self._connected.isSet():
+                                c = self._sock.recv(1)
 
-                    # make sure we are still locked, we should not have to check this
-                    if not self.sock_lock.locked():
-                        raise ManagerException('self.sock_lock is not locked')
+                                if not c:  # the other end closed the connection
+                                    self._sock.shutdown(1)
+                                    self._sock.close()
+                                    self._connected.clear()
+                                    break
+                                
+                                line.append(c)  # append the character to our line
 
-                    # make sure there are no problems with the connection
-                    if self.sock.fileno() < 0:
-                        raise ManagerSocketException('Connection Terminated')
+                                # is this the end of a line?
+                                if c == '\n':
+                                    line = ''.join(line)
+                                    break
 
-                    # read a message
-                    while self.connected.isSet():
-                        line = []
- 
-                        # read a line, one char at a time 
-                        while self.connected.isSet():
-                            c = self.sock.recv(1)
+                            # if we are no longer connected we probably did not
+                            # recieve a full message, don't try to handle it
+                            if not self._connected.isSet(): break
 
-                            if not c:  # the other end closed the connection
-                                self.sock.shutdown(1)
-                                self.sock.close()
-                                self.connected.clear()
+                            # make sure our line is a string
+                            assert type(line) in StringTypes
+
+                            lines.append(line) # add the line to our message
+
+                            # if the line is our EOL marker we have a complete message
+                            if line == EOL:
                                 break
-                            
-                            if DEBUG > 3:
-                                sys.stderr.write(repr(c))
 
-                            line.append(c)  # append the character to our line
-
-                            # is this the end of a line?
-                            if c == '\n':
-                                if DEBUG > 3:
-                                    sys.stderr.write('\n')
-                                line = ''.join(line)
+                            # check to see if this is the greeting line    
+                            if line.find('/') >= 0 and line.find(':') < 0:
+                                self.title = line.split('/')[0].strip() # store the title of the manager we are connecting to
+                                self.version = line.split('/')[1].strip() # store the version of the manager we are connecting to
                                 break
 
-                        # if we are no longer connected we probably did not
-                        # recieve a full message, don't try to handle it
-                        if not self.connected.isSet(): break
+                            #sleep(.001)  # waste some time before reading another line
 
-                        # make sure our line is a string
-                        assert type(line) in StringTypes
-
-                        if DEBUG:
-                            print line
-
-                        lines.append(line) # add the line to our message
-
-                        # if the line is our EOL marker we have a complete message
-                        if line == EOL:
-                            break
-
-                        # check to see if this is the greeting line    
-                        if line.find('/') >= 0 and line.find(':') < 0:
-                            self.title = line.split('/')[0].strip() # store the title of the manager we are connecting to
-                            self.version = line.split('/')[1].strip() # store the version of the manager we are connecting to
-                            break
-
-                            # why is this here
-                            if DEBUG > 2:
-                                sys.stderr.write('.')
-
-                        #sleep(.001)  # waste some time before reading another line
+                except socket.error:
+                    self._sock.shutdown(1)
+                    self._sock.close()
+                    self._connected.clear()
 
             # just in case there are any problems make sure we handle
             # unlocking and such
             finally:
                 # if we have a message append it to our queue
-                if lines and self.connected.isSet():
-                    self.message_queue.put(StringIO(''.join(lines)))
-
-                if DEBUG > 2:
-                    sys.stderr.write('-')
+                if lines and self._connected.isSet():
+                    self._message_queue.put(StringIO(''.join(lines)))
 
                 # release our lock, we are done for now
-                self.sock_lock.release()
+                self._sock_lock.release()
     
     def register_event(self, event, function):
         """
@@ -382,9 +370,9 @@ class Manager(object):
 
         # get the current value, or an empty list
         # then add our new callback
-        current_callbacks = self.event_callbacks.get(event, [])
+        current_callbacks = self._event_callbacks.get(event, [])
         current_callbacks.append(function)
-        self.event_callbacks[event] = current_callbacks
+        self._event_callbacks[event] = current_callbacks
 
     def event_loop(self):
         """
@@ -400,9 +388,9 @@ class Manager(object):
 
         try:
             # loop getting messages from the queue
-            while self.running.isSet():
+            while self._running.isSet():
                 # get/wait for messages
-                data = self.message_queue.get()
+                data = self._message_queue.get()
 
                 # if we got None as our message we are done
                 if not data:
@@ -413,10 +401,10 @@ class Manager(object):
 
                 # check if this is an event message
                 if message.has_header('Event'):
-                    self.event_queue.put(Event(message))
+                    self._event_queue.put(Event(message))
                 # check if this is a response
                 elif message.has_header('Response'):
-                    self.response_queue.put(message)
+                    self._response_queue.put(message)
                 # this is an unknown message
                 else:
                     print 'No clue what we got\n%s' % message.data
@@ -429,9 +417,9 @@ class Manager(object):
         """This thread is responsible fore dispatching events"""
 
         # loop dispatching events
-        while self.running.isSet():
+        while self._running.isSet():
             # get/wait for an event
-            ev = self.event_queue.get()
+            ev = self._event_queue.get()
 
             # if we got None as an event, we are finished
             if not ev:
@@ -440,23 +428,19 @@ class Manager(object):
             # dispatch our events
 
             # first build a list of the functions to execute
-            callbacks = self.event_callbacks.get(ev.name, [])
-            callbacks.extend(self.event_callbacks.get('*', []))
+            callbacks = self._event_callbacks.get(ev.name, [])
+            callbacks.extend(self._event_callbacks.get('*', []))
 
             # now execute the functions  
             for callback in callbacks:
                if callback(ev, self):
                   break
 
-    def connect(self, host='', port=0):
+    def connect(self, host, port=5038):
         """Connect to the manager interface"""
 
-        if self.connected.isSet():
+        if self._connected.isSet():
             raise ManagerException('Already connected to manager')
-
-        # set the host and port
-        host = host or self.host
-        port = port or self.port
 
         # make sure host is a string
         assert type(host) in StringTypes
@@ -464,23 +448,23 @@ class Manager(object):
         port = int(port)  # make sure port is an int
 
         # create our socket and connect
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-           self.sock.connect((host,port))
+           self._sock.connect((host,port))
         except socket.error, (errno, reason):
            raise ManagerSocketException(errno, reason)
 
         # check if we can write to the socket
-        rsocks, wsocks, esocks = select([],[self.sock],[],1)
+        rsocks, wsocks, esocks = select([],[self._sock],[],1)
         if not wsocks:
             raise ManagerException('Could not establish connection')
 
-        self.sock.setblocking(1)  # make this a blocking socket
+        self._sock.setblocking(1)  # make this a blocking socket
         #self.sock.settimeout(.5)
 
         # we are connected and running
-        self.connected.set()
-        self.running.set()
+        self._connected.set()
+        self._running.set()
 
         # start the event thread
         self.event_thread.start()
@@ -489,23 +473,22 @@ class Manager(object):
         self.event_dispatch_thread.start()
 
         # get our inital connection response
-        return self.response_queue.get()
+        return self._response_queue.get()
 
     def quit(self):
         """Shutdown the connection to the manager"""
         
         # if we are still running, logout
-        if self.running.isSet() and self.connected.isSet():
+        if self._running.isSet() and self._connected.isSet():
             self.logoff()
          
-
-        if self.running.isSet():
+        if self._running.isSet():
             # put None in the queues to make our threads exit
-            self.message_queue.put(None)
-            self.event_queue.put(None)
+            self._message_queue.put(None)
+            self._event_queue.put(None)
 
-            for waiter in self.reswaiting:
-                self.response_queue.put(None)
+            for waiter in self._reswaiting:
+                self._response_queue.put(None)
 
             # wait for the event thread to exit
             self.event_thread.join()
@@ -515,24 +498,19 @@ class Manager(object):
                 # wait for the dispatch thread to exit
                 self.event_dispatch_thread.join()
             
-        self.running.clear()
+        self._running.clear()
 
 
-    def login(self, username='', secret=''):
+    def login(self, username, secret):
         """Login to the manager, throws ManagerAuthException when login falis"""
-        if not self.connected.isSet():
-            raise ManagerException("Not connected")
            
         cdict = {'Action':'Login'}
         cdict['Username'] = username
         cdict['Secret'] = secret
         response = self.send_action(cdict)
         
-        if not response:
-            raise ManagerSocketException("Connection close by remote host")
-
         if response.get_header('Response') == 'Error':
-           self.connected.clear()
+           self._connected.clear()
            self.quit()  # clean up
            raise ManagerAuthException(response.get_header('Message'))
         
@@ -540,63 +518,39 @@ class Manager(object):
 
     def ping(self):
         """Send a ping action to the manager"""
-        if not self.connected.isSet():
-            raise ManagerException("Not connected")
         cdict = {'Action':'Ping'}
         response = self.send_action(cdict)
-
-        if not response:
-            raise ManagerSocketException("Connection close by remote host")
-        
         return response
 
     def logoff(self):
         """Logoff from the manager"""
 
-        if not self.connected.isSet():
-            raise ManagerException("Not connected")
         cdict = {'Action':'Logoff'}
         response = self.send_action(cdict)
-        
-        # if this is true we were probably successful
-        if not response:
-            self.running.clear()
         
         return response
 
     def hangup(self, channel):
         """Hanup the specfied channel"""
     
-        if not self.connected.isSet():
-            raise ManagerException("Not connected")
         cdict = {'Action':'Hangup'}
         cdict['Channel'] = channel
         response = self.send_action(cdict)
         
-        if not response:
-            raise ManagerSocketException("Connection close by remote host")
-
         return response
 
     def status(self, channel = ''):
         """Get a status message from asterisk"""
 
-        if not self.connected.isSet():
-            raise ManagerException("Not connected")
         cdict = {'Action':'Status'}
         cdict['Channel'] = channel
         response = self.send_action(cdict)
         
-        if not response:
-            raise ManagerSocketException("Connection close by remote host")
-
         return response
 
     def redirect(self, channel, exten, priority='1', extra_channel='', context=''):
         """Redirect a channel"""
     
-        if not self.connected.isSet():
-            raise ManagerException("Not connected")
         cdict = {'Action':'Redirect'}
         cdict['Channel'] = channel
         cdict['Exten'] = exten
@@ -605,16 +559,11 @@ class Manager(object):
         if extra_channel: cdict['ExtraChannel'] = extra_channel
         response = self.send_action(cdict)
         
-        if not response:
-            raise ManagerSocketException("Connection close by remote host")
-
         return response
 
     def originate(self, channel, exten, context='', priority='', timeout='', caller_id='', async=False, account='', variables={}):
         """Originate a call"""
 
-        if not self.connected.isSet():
-            raise ManagerException("Not connected")
         cdict = {'Action':'Originate'}
         cdict['Channel'] = channel
         cdict['Exten'] = exten
@@ -631,79 +580,50 @@ class Manager(object):
               
         response = self.send_action(cdict)
         
-        if not response:
-            raise ManagerSocketException("Connection close by remote host")
-
         return response
 
     def mailbox_status(self, mailbox):
         """Get the status of the specfied mailbox"""
      
-        if not self.connected.isSet():
-            raise ManagerException("Not connected")
         cdict = {'Action':'MailboxStatus'}
         cdict['Mailbox'] = mailbox
         response = self.send_action(cdict)
         
-        if not response:
-            raise ManagerSocketException("Connection close by remote host")
-
         return response
 
     def command(self, command):
         """Execute a command"""
 
-        if not self.connected.isSet():
-            raise ManagerException("Not connected")
-
         cdict = {'Action':'Command'}
         cdict['Command'] = command
         response = self.send_action(cdict)
         
-        if not response:
-            raise ManagerSocketException("Connection close by remote host")
-
         return response
 
     def extension_state(self, exten, context):
         """Get the state of an extension"""
 
-        if not self.connected.isSet():
-            raise ManagerException("Not connected")
         cdict = {'Action':'ExtensionState'}
         cdict['Exten'] = exten
         cdict['Context'] = context
         response = self.send_action(cdict)
         
-        if not response:
-            raise ManagerSocketException("Connection close by remote host")
-
         return response
 
     def absolute_timeout(self, channel, timeout):
         """Set an absolute timeout on a channel"""
         
-        if not self.connected.isSet():
-            raise ManagerException("Not connected")
         cdict = {'Action':'AbsoluteTimeout'}
         cdict['Channel'] = channel
         cdict['Timeout'] = timeout
         response = self.send_action(cdict)
-        
-        if not response:
-            raise ManagerSocketException("Connection close by remote host")
 
         return response
 
     def mailbox_count(self, mailbox):
-        if not self.connected.isSet():
-            raise ManagerException("Not connected")
         cdict = {'Action':'MailboxCount'}
         cdict['Mailbox'] = mailbox
         response = self.send_action(cdict)
-        
-        if not response:
-            raise ManagerSocketException("Connection close by remote host")
 
         return response
 
@@ -711,37 +631,3 @@ class ManagerException(Exception): pass
 class ManagerSocketException(ManagerException): pass
 class ManagerAuthException(ManagerException): pass
 
-
-if __name__=='__main__':
-    from pprint import pprint
-
-    # our call back function
-    def spew(event, mgr):
-        print 'EVENT: ', event.name
-        pprint(event.headers)
-        pprint(event.data)
-
-    # our manager interface
-    mgr = Manager('myastbox')
-    mgr.register_event('*', spew)  # register a catch all event function
-
-    # connect to the manager
-    mess = mgr.connect()
-    pprint(mess.headers)
-    pprint(mess.data)
-   
-    # send our auth data
-    mess = mgr.login('username','passwd')
-    pprint(mess.headers)
-    pprint(mess.data)
-
-    try:
-        #raw_input("Press <enter> to exit")
-        while 1:
-            sleep(5)
-            os.system('clear')
-            mess = mgr.status()
-            pprint(mess.headers)
-            pprint(mess.data)
-    finally:
-        mgr.quit()

@@ -1,6 +1,6 @@
 Summary: An interface to AGI
 Name: python-pyst
-Version: 0.0.4rc13
+Version: 0.0.5
 Release: 2.centos4.0
 Source0: http://prdownloads.sourceforge.net/pyst/pyst-%{version}.tar.gz
 License: LGPL
