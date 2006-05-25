@@ -197,7 +197,7 @@ class Manager(object):
     #def __del__(self):
     #    self.quit()
 
-    def connected():
+    def connected(self):
         """
         Check if we are connected or not.
         """
