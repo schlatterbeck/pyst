@@ -355,7 +355,7 @@ class Manager(object):
                 # if we have a message append it to our queue
                 if lines and self._connected.isSet():
                     self._message_queue.put(StringIO(''.join(lines)))
-                else
+                else:
                     self._message_queue.put(None)
 
                 # release our lock, we are done for now
