@@ -313,7 +313,6 @@ class Manager(object):
                                 c = self._sock.recv(1)
 
                                 if not c:  # the other end closed the connection
-                                    self._sock.shutdown(1)
                                     self._sock.close()
                                     self._connected.clear()
                                     break
@@ -347,7 +346,6 @@ class Manager(object):
                             #sleep(.001)  # waste some time before reading another line
 
                 except socket.error:
-                    self._sock.shutdown(1)
                     self._sock.close()
                     self._connected.clear()
 
