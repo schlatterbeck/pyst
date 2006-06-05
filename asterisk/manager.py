@@ -57,7 +57,6 @@ import socket
 import threading
 import Queue
 import re
-from select import select
 from cStringIO import StringIO
 from types import *
 from time import sleep
@@ -161,10 +160,6 @@ class Event(object):
 
 class Manager(object):
     def __init__(self):
-        # _sock_lock is used to serialize acces to the socket in the case of us
-        # issuing a command and wanting to read the immediate response
-        self._sock_lock = threading.Lock()
-
         self._sock = None     # our socket
         self._connected = threading.Event()
         self._running = threading.Event()
@@ -187,10 +182,10 @@ class Manager(object):
         self._seq = 0
        
         # some threads
-        self.event_thread = threading.Thread(target=self.event_loop)
+        self.message_thread = threading.Thread(target=self.message_loop)
         self.event_dispatch_thread = threading.Thread(target=self.event_dispatch)
         
-        self.event_thread.setDaemon(True)
+        self.message_thread.setDaemon(True)
         self.event_dispatch_thread.setDaemon(True)
 
 
@@ -252,114 +247,85 @@ class Manager(object):
         clist.append(EOL)
         command = EOL.join(clist)
 
-        # make sure the socket is available for writing
-        rsocks, wsocks, esocks = select([],[self._sock],[],60)
-
-        # if our socket is not available for writing, handle it
-        if not wsocks:
-            raise ManagerSocketException('Communication Problem:  self._sock not ready for writing')
-        if self._sock.fileno() < 0:
-            raise ManagerSocketException('Connection Terminated')
-
         # lock the soket and send our command
-        self._sock_lock.acquire()
         try:
             self._sock.sendall(command)
-        finally:
-            # release the lock
-            self._sock_lock.release()
+        except socket.error, (errno, reason):
+            raise ManagerSocketException(errno, reason)
         
         self._reswaiting.insert(0,1)
         response = self._response_queue.get()
         self._reswaiting.pop(0)
+
+        if not response:
+            raise ManagerSocketException(0, 'Connection Terminated')
 
         return response
 
     def _receive_data(self):
         """
         Read the response from a command.
-        This SHOULD be called from a block that is locked
-        on self._sock_lock
-        self._sock should also be ready for reading
         """
 
         # loop while we are sill running and connected
         while self._running.isSet() and self._connected.isSet():
-            
-            # set up for non-blocking action
-            rsocks, wsocks, esocks = select([self._sock],[],[],1)
 
             lines = []
-
-            self._sock_lock.acquire()
             try:
                 try:
                     # if there is data to be read
-                    if rsocks:
-                        # make sure we are still locked, we should not have to check this
-                        if not self._sock_lock.locked():
-                            raise ManagerException('self._sock_lock is not locked')
-
-                        # make sure there are no problems with the connection
-                        if self._sock.fileno() < 0:
-                            raise ManagerSocketException('Connection Terminated')
-
-                        # read a message
-                        while self._connected.isSet():
-                            line = []
+                    # read a message
+                    while self._connected.isSet():
+                        line = []
      
-                            # read a line, one char at a time 
-                            while self._connected.isSet():
-                                c = self._sock.recv(1)
+                        # read a line, one char at a time 
+                        while self._connected.isSet():
+                            c = self._sock.recv(1)
 
-                                if not c:  # the other end closed the connection
-                                    self._sock.close()
-                                    self._connected.clear()
-                                    break
-                                
-                                line.append(c)  # append the character to our line
+                            if not c:  # the other end closed the connection
+                                self._sock.close()
+                                self._connected.clear()
+                                break
+                            
+                            line.append(c)  # append the character to our line
 
-                                # is this the end of a line?
-                                if c == '\n':
-                                    line = ''.join(line)
-                                    break
-
-                            # if we are no longer connected we probably did not
-                            # recieve a full message, don't try to handle it
-                            if not self._connected.isSet(): break
-
-                            # make sure our line is a string
-                            assert type(line) in StringTypes
-
-                            lines.append(line) # add the line to our message
-
-                            # if the line is our EOL marker we have a complete message
-                            if line == EOL:
+                            # is this the end of a line?
+                            if c == '\n':
+                                line = ''.join(line)
                                 break
 
-                            # check to see if this is the greeting line    
-                            if line.find('/') >= 0 and line.find(':') < 0:
-                                self.title = line.split('/')[0].strip() # store the title of the manager we are connecting to
-                                self.version = line.split('/')[1].strip() # store the version of the manager we are connecting to
-                                break
+                        # if we are no longer connected we probably did not
+                        # recieve a full message, don't try to handle it
+                        if not self._connected.isSet(): break
 
-                            #sleep(.001)  # waste some time before reading another line
+                        # make sure our line is a string
+                        assert type(line) in StringTypes
+
+                        lines.append(line) # add the line to our message
+
+                        # if the line is our EOL marker we have a complete message
+                        if line == EOL:
+                            break
+
+                        # check to see if this is the greeting line    
+                        if line.find('/') >= 0 and line.find(':') < 0:
+                            self.title = line.split('/')[0].strip() # store the title of the manager we are connecting to
+                            self.version = line.split('/')[1].strip() # store the version of the manager we are connecting to
+                            break
+
+                        #sleep(.001)  # waste some time before reading another line
 
                 except socket.error:
                     self._sock.close()
                     self._connected.clear()
+                    break
 
-            # just in case there are any problems make sure we handle
-            # unlocking and such
             finally:
                 # if we have a message append it to our queue
                 if lines and self._connected.isSet():
                     self._message_queue.put(StringIO(''.join(lines)))
                 else:
                     self._message_queue.put(None)
-
-                # release our lock, we are done for now
-                self._sock_lock.release()
     
     def register_event(self, event, function):
         """
@@ -374,7 +340,7 @@ class Manager(object):
         current_callbacks.append(function)
         self._event_callbacks[event] = current_callbacks
 
-    def event_loop(self):
+    def message_loop(self):
         """
         The method for the event thread.
         This actually recieves all types of messages and places them
@@ -394,6 +360,10 @@ class Manager(object):
 
                 # if we got None as our message we are done
                 if not data:
+                    # notify the other queues
+                    self._event_queue.put(None)
+                    for waiter in self._reswaiting:
+                        self._response_queue.put(None)
                     break
 
                 # parse the data
@@ -448,31 +418,23 @@ class Manager(object):
         port = int(port)  # make sure port is an int
 
         # create our socket and connect
-        self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         try:
-           self._sock.connect((host,port))
+            self._sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self._sock.connect((host,port))
         except socket.error, (errno, reason):
-           raise ManagerSocketException(errno, reason)
-
-        # check if we can write to the socket
-        rsocks, wsocks, esocks = select([],[self._sock],[],1)
-        if not wsocks:
-            raise ManagerException('Could not establish connection')
-
-        self._sock.setblocking(1)  # make this a blocking socket
-        #self.sock.settimeout(.5)
+            raise ManagerSocketException(errno, reason)
 
         # we are connected and running
         self._connected.set()
         self._running.set()
 
         # start the event thread
-        self.event_thread.start()
+        self.message_thread.start()
 
         # start the event dispatching thread
         self.event_dispatch_thread.start()
 
-        # get our inital connection response
+        # get our initial connection response
         return self._response_queue.get()
 
     def quit(self):
@@ -483,15 +445,11 @@ class Manager(object):
             self.logoff()
          
         if self._running.isSet():
-            # put None in the queues to make our threads exit
+            # put None in the message_queue to kill our threads
             self._message_queue.put(None)
-            self._event_queue.put(None)
-
-            for waiter in self._reswaiting:
-                self._response_queue.put(None)
 
             # wait for the event thread to exit
-            self.event_thread.join()
+            self.message_thread.join()
 
             # make sure we do not join our self (when quit is called from event handlers)
             if threading.currentThread() != self.event_dispatch_thread:
@@ -510,8 +468,6 @@ class Manager(object):
         response = self.send_action(cdict)
         
         if response.get_header('Response') == 'Error':
-           self._connected.clear()
-           self.quit()  # clean up
            raise ManagerAuthException(response.get_header('Message'))
         
         return response
