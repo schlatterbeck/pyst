@@ -1,26 +1,26 @@
-pyst (0.0.5) unstable; urgency=low
+pyst (0.1.0-1) unstable; urgency=low
 
   * New release.
 
- -- Matthew A. Nicholson <mnicholson@localhost.localdomain>  Thu, 25 May 2006 16:30:38 -0500
+ -- Matthew Nicholson <mnicholson@digium.com>  Mon,  5 Jun 2006 15:11:24 -0500
 
 pyst (0.0.4rc13-1) unstable; urgency=low
 
   * New release.
 
- -- Matthew A. Nicholson <mnicholson@digium.com>  Tue, 21 Mar 2006 12:25:03 -0600
+ -- Matthew Nicholson <mnicholson@digium.com>  Tue, 21 Mar 2006 12:25:03 -0600
 
 pyst (0.0.4rc12-1) unstable; urgency=low
 
   * New release.
 
- -- Matthew A. Nicholson <mnicholson@digium.com>  Thu, 14 Apr 2005 17:15:46 -0500
+ -- Matthew Nicholson <mnicholson@digium.com>  Thu, 14 Apr 2005 17:15:46 -0500
 
 pyst (0.0.4rc11-1) unstable; urgency=low
 
   * New release.
 
- -- Matthew A. Nicholson <mnicholson@digium.com>  Thu,  3 Feb 2005 18:46:32 -0600
+ -- Matthew Nicholson <mnicholson@digium.com>  Thu,  3 Feb 2005 18:46:32 -0600
 
 pyst (0.0.4rc10-1) unstable; urgency=low
 
@@ -28,29 +28,29 @@ pyst (0.0.4rc10-1) unstable; urgency=low
   * Version number correction.
   * Added line number tracking to config.py
 
- -- Matthew A. Nicholson <mnicholson@digium.com>  Tue, 11 Jan 2005 11:30:59 -0600
+ -- Matthew Nicholson <mnicholson@digium.com>  Tue, 11 Jan 2005 11:30:59 -0600
 
 pyst (0.0.4rc9-1) unstable; urgency=low
 
   * Removed DEBUG flag
 
- -- Matthew A. Nicholson <mnicholson@digium.com>  Mon, 10 Jan 2005 18:40:04 -0600
+ -- Matthew Nicholson <mnicholson@digium.com>  Mon, 10 Jan 2005 18:40:04 -0600
 
 pyst (0.0.4rc8-1) unstable; urgency=low
 
   * More manager.py updates 
 
- -- Matthew A. Nicholson <mnicholson@digium.com>  Thu,  6 Jan 2005 12:19:42 -0600
+ -- Matthew Nicholson <mnicholson@digium.com>  Thu,  6 Jan 2005 12:19:42 -0600
 
 pyst (0.0.4rc7-1) unstable; urgency=low
 
   * A bunch of fixes to make the manager interface useable
 
- -- Matthew A. Nicholson <mnicholson@digium.com>  Wed,  5 Jan 2005 19:02:38 -0600
+ -- Matthew Nicholson <mnicholson@digium.com>  Wed,  5 Jan 2005 19:02:38 -0600
 
 pyst (0.0.4rc6-1) unstable; urgency=low
 
   * Initial Release.
 
- -- Matthew A. Nicholson <mnicholson@digium.com>  Mon, 29 Nov 2004 14:06:42 -0600
+ -- Matthew Nicholson <mnicholson@digium.com>  Mon, 29 Nov 2004 14:06:42 -0600
 

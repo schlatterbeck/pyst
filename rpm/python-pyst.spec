@@ -37,7 +37,7 @@ rm -rf $RPM_BUILD_ROOT
 %{_libdir}/python*/site-packages/asterisk/
 
 %changelog
-* Tue Mar 21 2006 Matthew A. Nicholson <mnicholson@digium.com> el4.3
+* Tue Mar 21 2006 Matthew Nicholson <mnicholson@digium.com> el4.3
 - Bumped version number.
 
 * Thu Feb 23 2006 Antoine Brenner <http://www.gymglish.com> el4.2

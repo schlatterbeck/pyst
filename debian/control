@@ -1,7 +1,7 @@
 Source: pyst
 Section: python
 Priority: optional
-Maintainer: Matthew A. Nicholson <mnicholson@digium.com>
+Maintainer: Matthew Nicholson <mnicholson@digium.com>
 Build-Depends: debhelper (>= 4.0.0), cdbs
 Build-Depends-Indep: python2.3-dev, python
 Standards-Version: 3.6.1

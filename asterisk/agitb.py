@@ -29,8 +29,8 @@ If you do not pass anything to handler() it will use sys.exc_info().
 This script was adapted from Ka-Ping Yee's cgitb.
 """
 
-__author__ = 'Matthew A. Nicholson'
-__version__ = '$Revision: 0.2$'
+__author__ = 'Matthew Nicholson'
+__version__ = '0.1.0'
 
 import sys
 
