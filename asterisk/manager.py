@@ -11,7 +11,7 @@ This module provides a Python API for interfacing with the asterisk manager.
 
    def handle_shutdown(event, manager):
       print "Recieved shutdown event"
-      manager.quit()
+      manager.close()
       # we could analize the event and reconnect here
       
    def handle_event(event, manager):
@@ -44,7 +44,7 @@ This module provides a Python API for interfacing with the asterisk manager.
           
    finally:
       # remember to clean up
-      manager.quit()
+      manager.close()
 
 Remember all header, response, and event names are case sensitive.
 
@@ -189,8 +189,8 @@ class Manager(object):
         self.event_dispatch_thread.setDaemon(True)
 
 
-    #def __del__(self):
-    #    self.quit()
+    def __del__(self):
+        self.close()
 
     def connected(self):
         """
@@ -437,7 +437,7 @@ class Manager(object):
         # get our initial connection response
         return self._response_queue.get()
 
-    def quit(self):
+    def close(self):
         """Shutdown the connection to the manager"""
         
         # if we are still running, logout
@@ -451,7 +451,7 @@ class Manager(object):
             # wait for the event thread to exit
             self.message_thread.join()
 
-            # make sure we do not join our self (when quit is called from event handlers)
+            # make sure we do not join our self (when close is called from event handlers)
             if threading.currentThread() != self.event_dispatch_thread:
                 # wait for the dispatch thread to exit
                 self.event_dispatch_thread.join()
