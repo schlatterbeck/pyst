@@ -7,4 +7,5 @@ include debian/copyright
 include rpm/python-pyst.spec
 include ChangeLog
 include TODO
+include UPGRADE
 include MANIFEST.in

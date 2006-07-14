@@ -519,15 +519,15 @@ class AGI:
         return int(result['result'][0])
 
     def set_variable(self, name, value):
-        """agi.set_variable(name, value) --> None
+        """Set a channel variable.
         """
         self.execute('SET VARIABLE', self._quote(name), self._quote(value))
 
     def get_variable(self, name):
-        """agi.get_variable(name) --> str
-        Returns 0 if <variablename> is not set.  Returns 1 if <variablename>
-        is set and returns the variable in parenthesis
-        example return code: 200 result=1 (testvariable)
+        """Get a channel variable.
+
+        This function returns the value of the indicated channel variable.  If
+        the variable is not set, an empty string is returned.
         """
         try:
            result = self.execute('GET VARIABLE', self._quote(name))
@@ -535,9 +535,6 @@ class AGI:
            result = {'result': ('1', 'hangup')}
 
         res, value = result['result']
-        if res == '0':
-            raise AGIAppError("Variable %s is not set" % name)
-
         return value
 
     def verbose(self, message, level=1):

@@ -1,5 +1,13 @@
 2006-07-14  Matthew Nicholson  <mnicholson@digium.com>
 
+	* TODO: Updated.
+	* asterisk/agi.py (set_variable): Documentation changes.
+	* asterisk/agi.py (get_variable): Changed to return and empty string
+	instead of throwing an exception when a channel variable is not set.
+	* UPGRADE: Added.
+
+2006-07-14  Matthew Nicholson  <mnicholson@digium.com>
+
 	* ChangeLog: Added.
 	* TODO: Added.
 	* MANIFEST.in: Added ChangeLog and TODO.
