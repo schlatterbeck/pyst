@@ -1,5 +1,10 @@
 2006-07-14  Matthew Nicholson  <mnicholson@digium.com>
 
+	* asterisk/agi.py (wait_for_digit): Only catch ValueError, not all
+	exceptions.
+
+2006-07-14  Matthew Nicholson  <mnicholson@digium.com>
+
 	* TODO: Updated.
 	* asterisk/agi.py (set_variable): Documentation changes.
 	* asterisk/agi.py (get_variable): Changed to return and empty string

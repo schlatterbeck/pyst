@@ -179,7 +179,7 @@ class AGI:
         else:
             try:
                 return chr(int(res))
-            except:
+            except ValueError:
                 raise AGIError('Unable to convert result to digit: %s' % res)
 
     def send_text(self, text=''):
