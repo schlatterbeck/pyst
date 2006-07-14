@@ -1,0 +1,6 @@
+2006-07-14  Matthew Nicholson  <mnicholson@digium.com>
+
+	* ChangeLog: Added.
+	* TODO: Added.
+	* MANIFEST.in: Added ChangeLog and TODO.
+
