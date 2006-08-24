@@ -1,4 +1,6 @@
 
 Upgrading from:
- - 0.1.0: agi.get_variable no longer throws an exception, instead it returns an
-   empty string when a channel variable is not set.
+ - 0.1.0:
+   * agi.get_variable no longer throws an exception, instead it returns an
+     empty string when a channel variable is not set.
+   * manager.quit() has be renamed to manager.close()
