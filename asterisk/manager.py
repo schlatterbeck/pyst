@@ -340,6 +340,14 @@ class Manager(object):
         current_callbacks.append(function)
         self._event_callbacks[event] = current_callbacks
 
+    def unregister_event(self, event, function):
+        """
+        Unregister a callback for the specified event.
+        """
+        current_callbacks = self._event_callbacks.get(event, [])
+        current_callbacks.remove(function)
+        self._event_callbacks[event] = current_callbacks
+
     def message_loop(self):
         """
         The method for the event thread.

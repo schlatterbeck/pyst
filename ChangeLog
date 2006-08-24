@@ -1,5 +1,9 @@
 2006-08-23  Matthew Nicholson  <mnicholson@digium.com>
 
+	* asterisk/manager.py (unregister_event): Added.
+
+2006-08-23  Matthew Nicholson  <mnicholson@digium.com>
+
 	* NEWS: Added.
 
 2006-07-14  Matthew Nicholson  <mnicholson@digium.com>
