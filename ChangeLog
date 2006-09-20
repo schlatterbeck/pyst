@@ -1,5 +1,10 @@
 2006-09-19  Matthew Nicholson  <mnicholson@digium.com>
 
+	* debian/control: Removed XS-Python-Versions header to make it default
+	to all python versions.
+
+2006-09-19  Matthew Nicholson  <mnicholson@digium.com>
+
 	* setup.py: Updated version.
 
 2006-09-19  Matthew Nicholson  <mnicholson@digium.com>

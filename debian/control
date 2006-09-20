@@ -3,7 +3,6 @@ Section: python
 Priority: optional
 Maintainer: Matthew Nicholson <mnicholson@digium.com>
 Build-Depends-Indep: debhelper (>= 5.0.37.2), cdbs (>= 0.4.43), python-all-dev (>= 2.3.5-11), python-support (>= 0.3)
-XS-Python-Version: all
 Standards-Version: 3.6.1
 
 Package: python-pyst
