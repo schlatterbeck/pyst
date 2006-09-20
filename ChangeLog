@@ -1,5 +1,9 @@
 2006-09-19  Matthew Nicholson  <mnicholson@digium.com>
 
+	* MANIFEST.in: Added NEWS to manifest.
+
+2006-09-19  Matthew Nicholson  <mnicholson@digium.com>
+
 	* debian/rules: Updated to reflect new python policy.
 	* debian/control: Updated to reflect new python policy.
 	* debian/changelog: Updated.
