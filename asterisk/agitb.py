@@ -152,7 +152,7 @@ class Hook:
         self.display = display          # send tracebacks to browser if true
         self.logdir = logdir            # log tracebacks to files if not None
         self.context = context          # number of source code lines per frame
-        self.file = file or sys.stdout  # place to send the output
+        self.file = file or sys.stderr  # place to send the output
         self.agi = agi
 
     def __call__(self, etype, evalue, etb):
