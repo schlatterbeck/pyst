@@ -1,3 +1,7 @@
+2006-10-24  Matthew Nicholson  <mnicholson@digium.com>
+	
+	* asterisk/agi.py: Added get_variable_full command.
+
 2006-10-18  Matthew Nicholson  <mnicholson@digium.com>
 
 	* asterisk/agitb.py: Make error output default to sys.stderr instead

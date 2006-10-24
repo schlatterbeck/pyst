@@ -537,6 +537,24 @@ class AGI:
         res, value = result['result']
         return value
 
+    def get_full_variable(self, name, channel = None):
+        """Get a channel variable.
+
+        This function returns the value of the indicated channel variable.  If
+        the variable is not set, an empty string is returned.
+        """
+        try:
+           if channel:
+              result = self.execute('GET FULL VARIABLE', self._quote(name), self._quote(channel))
+           else:
+              result = self.execute('GET FULL VARIABLE', self._quote(name))
+
+        except AGIResultHangup:
+           result = {'result': ('1', 'hangup')}
+
+        res, value = result['result']
+        return value
+
     def verbose(self, message, level=1):
         """agi.verbose(message='', level=1) --> None
         Sends <message> to the console via verbose message system.
