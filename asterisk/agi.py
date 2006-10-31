@@ -236,7 +236,7 @@ class AGI:
             except:
                 raise AGIError('Unable to convert result to char: %s' % res)
     
-    def control_stream_file(self, filename, escape_digits='', skipms='', fwd='', rew='', pause=''):
+    def control_stream_file(self, filename, escape_digits='', skipms=3000, fwd='', rew='', pause=''):
         """
         Send the given file, allowing playback to be interrupted by the given
         digits, if any.  escape_digits is a string '12345' or a list  of 
@@ -247,7 +247,7 @@ class AGI:
         extension must not be included in the filename.
         """
         escape_digits = self._process_digit_list(escape_digits)
-        response = self.execute('CONTROL STREAM FILE', filename, escape_digits, skipms, fwd, rew, pause)
+        response = self.execute('CONTROL STREAM FILE', self._quote(filename), escape_digits, self._quote(skipms), self._quote(fwd), self._quote(rew), self._quote(pause))
         res = response['result'][0]
         if res == '0':
             return ''

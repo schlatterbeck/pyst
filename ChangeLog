@@ -1,3 +1,8 @@
+2006-10-30  Matthew Nicholson  <mnicholson@digium.com>
+
+	* asterisk/agi.py (AGI.control_stream_file): Changed default skipms
+	and quoted arguments.
+
 2006-10-24  Matthew Nicholson  <mnicholson@digium.com>
 	
 	* asterisk/agi.py: Added get_variable_full command.
