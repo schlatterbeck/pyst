@@ -1,5 +1,10 @@
 2006-10-30  Matthew Nicholson  <mnicholson@digium.com>
 
+	* ChangeLog: Fixed previous entry.
+
+2006-10-30  Matthew Nicholson  <mnicholson@digium.com>
+
+	* TODO: Updated.
 	* asterisk/agi.py (AGI.control_stream_file): Changed default skipms
 	and quoted arguments.
 
