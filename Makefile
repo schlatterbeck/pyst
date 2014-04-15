@@ -1,6 +1,6 @@
 CDUP=../..
 PKG=asterisk
-PY=agi.py  agitb.py  config.py  __init__.py  manager.py
+PY=agi.py agitb.py astemu.py compat.py config.py __init__.py manager.py
 SRC=Makefile MANIFEST.in setup.py README README.html \
     $(PY:%.py=$(PKG)/%.py)
 
@@ -30,4 +30,8 @@ clean:
 
 release: upload upload_homepage announce_pypi announce
 
-include ../make/Makefile-sf
+ifeq (,${RELEASETOOLS})
+    RELEASETOOLS=../releasetools
+endif
+
+include $(RELEASETOOLS)/Makefile-sf

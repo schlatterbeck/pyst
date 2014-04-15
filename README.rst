@@ -12,6 +12,18 @@ Asterisk from python. The library currently supports AGI, AMI, and the parsing
 of Asterisk configuration files. The library also includes debugging facilities
 for AGI.
 
+News: The source code is now in a GIT repository on Sourceforge.
+To check out anonymously into the local directory ``pyst``, use::
+
+ git clone git://git.code.sf.net/p/pyst/code pyst
+
+Thanks to Eric S. Raymond's `reposurgeon`_, it was possible to unite the
+old CVS repository, the monotone repository used until 0.2 (and a little
+beyond 0.2) and the recent subversion repository into one git repository
+that contains the whole history and cleans up some artefacts.
+
+.. _reposurgeon: http://www.catb.org/esr/reposurgeon/
+
 A note on maintenance and forks:
 The current maintainer is Ralf Schlatterbeck. I've contacted maintainers
 of forks to try to join forces. For any questions, please contact me via
@@ -42,9 +54,11 @@ pythons built-in help facility::
 Some notes on platforms: We now specify "platforms = 'Any'" in
 ``setup.py``. This means, the manager part of the package will probably
 run on any platform. The agi scripts on the other hand are called
-directly on the host where Asterisk is running. Since Asterisk doesn't
-run on windows platforms (and probably never will) the agi part of the
-package can only be run on Asterisk platforms.
+directly on the host where Asterisk is running in which case they are
+limited to the platforms asterisk is running on. Alternatively, you can
+use the *fastagi* mechanism of asterisk which calls the agi scripts on a
+remote host. In the latter case this host can be any platform where
+python runs.
 
 Credits
 -------
@@ -69,7 +83,7 @@ sure I really want to change all these things (in particular the
 threaded implementation looks good to me). I will maintain a section
 summarizing the changes in this README, the ChangeLog won't be
 maintained any longer. Detailed changes will be available in the version
-control tool (currently svn).
+control tool.
 
 * ChangeLog:
   The ChangeLog needs to be updated from the monotone logs.
@@ -134,31 +148,34 @@ If upgrading from...
 Source Code Repository Access
 -----------------------------
 
-The current versions are kept in a Subversion repository on Sourceforge.
+The current versions are kept in a GIT repository on Sourceforge.
 You can check out the trunk with::
 
-    svn co svn://svn.code.sf.net/p/pyst/svn/pyst/trunk pyst
+    git clone git://git.code.sf.net/p/pyst/code pyst
     
+There is a monotone-after-0.2 branch which contains unreleased changes
+after 0.2 which were committed to the monotone repository after the
+Release of Version 0.2 (which have been merged into trunk *after*
+changing how manager commands to asterisk are parsed).
 
-There is also a 0.2 branch in::
+Released versions are tagged, see the tags in the web-interface on
+Sourceforge (or use local git commands to find out)
 
-    svn://svn.code.sf.net/p/pyst/svn/pyst/branches/0.2
+    https://sourceforge.net/p/pyst/code/ci/master/tree/
 
-which contains unreleased changes after 0.2 (which have been merged into
-trunk *after* changing how manager commands to asterisk are parsed).
-
-Released versions are in::
-
-    https://pyst.svn.sourceforge.net/svnroot/pyst/pyst/tags
+For versions up to 0.6 the code was kept in a Subversion repository in
+Sourceforge. This has been incorporated into the current GIT repository
+(after cleaning up some subversion artefacts).
 
 For versions prior to the 0.2 release when Matthew Nicholson was
-maintaining pyst, the changes are kept in a `monotone`_ repository
-(monotone is a free distributed version control system). Please contact
-Matthew via Sourceforge if you're interested in intermediate versions.
+maintaining pyst, the changes were kept in a `monotone`_ repository
+(monotone is a free distributed version control system). This repository
+has also been incorporated into the GIT repository.
 
 .. _`monotone`: http://monotone.ca/
 
-prior to that the sources are in the CVS repository on sourceforge.
+prior to that the sources are in the CVS repository on sourceforge which
+has also been incorporated into the GIT repository.
 
 
 Changes
