@@ -1,3 +1,6 @@
+Note: This Changelog is no longer being maintained, for recent changes
+see the section "Changes" in the README.rst file.
+
 2007-01-26  Matthew Nicholson  <mnicholson@digium.com>
 
         * asterisk/manager.py: Make get_header() functions work like
