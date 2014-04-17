@@ -1,4 +1,10 @@
-CDUP=../..
+# To use this Makefile, get a copy of my SF Release Tools
+# git clone git://git.code.sf.net/p/sfreleasetools/code sfreleasetools
+# And point the environment variable RELEASETOOLS to the checkout
+
+ifeq (,${RELEASETOOLS})
+    RELEASETOOLS=../releasetools
+endif
 PKG=asterisk
 PY=agi.py agitb.py astemu.py compat.py config.py __init__.py manager.py
 SRC=Makefile MANIFEST.in setup.py README README.html \
@@ -6,7 +12,7 @@ SRC=Makefile MANIFEST.in setup.py README README.html \
 
 VERSIONPY=asterisk/Version.py
 VERSION=$(VERSIONPY)
-LASTRELEASE:=$(shell ../svntools/lastrelease -n)
+LASTRELEASE:=$(shell $(RELEASETOOLS)/lastrelease -n)
 
 USERNAME=schlatterbeck
 PROJECT=pyst
@@ -29,9 +35,5 @@ clean:
 
 
 release: upload upload_homepage announce_pypi announce
-
-ifeq (,${RELEASETOOLS})
-    RELEASETOOLS=../releasetools
-endif
 
 include $(RELEASETOOLS)/Makefile-sf

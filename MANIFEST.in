@@ -6,6 +6,6 @@ include debian/compat
 include debian/copyright
 include rpm/python-pyst.spec
 include ChangeLog
-include README
+include README.rst
 include README.html
 include MANIFEST.in
