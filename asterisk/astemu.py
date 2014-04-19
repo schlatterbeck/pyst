@@ -1,7 +1,11 @@
+from __future__ import absolute_import
+from __future__ import unicode_literals
+from __future__ import print_function
 import socket
 from   signal import SIGTERM
 from   os import fork, kill, waitpid
 from   time import sleep
+from   asterisk.compat import string_types
 
 class Event(dict):
     """ Events are encoded as dicts with a header fieldname to
@@ -44,18 +48,18 @@ class Event(dict):
         ret = []
         if 'Response' in self:
             self ['ActionID'] = [id]
-        for k,v in sorted(self.iteritems(), key=self.sort):
+        for k,v in sorted(self.items(), key=self.sort):
             if k == 'CONTENT':
                 ret.append(v)
             else :
-                if isinstance(v, str):
+                if isinstance(v, string_types):
                     ret.append (": ".join ((k, v)))
                 else:
                     for x in v:
                         ret.append (": ".join ((k, x)))
         ret.append ('')
         ret.append ('')
-        return '\r\n'.join (ret)
+        return '\r\n'.join (ret).encode('utf-8')
 
     @property
     def name(self):
@@ -111,13 +115,14 @@ class AsteriskEmu(object):
         """
         while True:
             conn, addr = sock.accept()
-            f = conn.makefile('rw')
+            f = conn.makefile('rwb')
             conn.close()
-            f.write('Asterisk Call Manager/1.1\r\n')
+            f.write('Asterisk Call Manager/1.1\r\n'.encode('utf-8'))
             f.flush()
             cmd = lastid = ''
             try:
                 for l in f:
+                    l = l.decode('utf-8')
                     if l.startswith ('ActionID:'):
                         lastid = l.split(':', 1)[1].strip()
                     elif l.startswith ('Action:'):

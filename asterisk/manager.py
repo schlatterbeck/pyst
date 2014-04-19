@@ -3,6 +3,7 @@
 
 from __future__ import absolute_import
 from __future__ import print_function
+from __future__ import unicode_literals
 
 """
 Python Interface for Asterisk Manager
@@ -15,7 +16,7 @@ This module provides a Python API for interfacing with the asterisk manager.
    def handle_shutdown(event, manager):
       print ("Received shutdown event")
       manager.close()
-      # we could analize the event and reconnect here
+      # we could analyze the event and reconnect here
       
    def handle_event(event, manager):
       print ("Received event: %s" % event.name)
@@ -69,7 +70,7 @@ EOL = '\r\n'
 class _Msg(object): 
     def has_header(self, hname):
         """Check for a header"""
-        return self.headers.has_key(hname)
+        return hname in self.headers
 
     def get_header(self, hname, defval = None):
         """Return the specified header"""
@@ -241,7 +242,7 @@ class Manager(object):
         cdict.update(kwargs)
 
         # set the action id
-        if not cdict.has_key('ActionID'):
+        if 'ActionID' not in cdict:
             cdict['ActionID'] = '%s-%04s-%08x' % (self.hostname,
                 self.pid, self.next_seq())
         clist = []
@@ -260,12 +261,12 @@ class Manager(object):
 
         # lock the socket and send our command
         try:
-            self._sock.write(command)
+            self._sock.write(command.encode('utf-8'))
             self._sock.flush()
         except socket.error as err:
             errno, reason = err
             raise ManagerSocketException(errno, reason)
-        
+
         self._reswaiting.insert(0,1)
         response = self._response_queue.get()
         self._reswaiting.pop(0)
@@ -288,7 +289,8 @@ class Manager(object):
             try:
                 lines = []
                 for line in self._sock :
-                    # check to see if this is the greeting line    
+                    line = line.decode('utf-8')
+                    # check to see if this is the greeting line
                     if not self.title and '/' in line and not ':' in line:
                         # store the title of the manager we are connecting to:
                         self.title = line.split('/')[0].strip()
@@ -369,7 +371,7 @@ class Manager(object):
         in the proper queues.
         """
 
-        # start a thread to recieve data
+        # start a thread to receive data
         t = threading.Thread(target=self._receive_data)
         t.setDaemon(True)
         t.start()
@@ -398,6 +400,7 @@ class Manager(object):
                 elif message.has_header('Response'):
                     self._response_queue.put(message)
                 else:
+                    self._response_queue.put(None)
                     print ('No clue what we got\n%s' % message.data)
         finally:
             # wait for our data receiving thread to exit
@@ -442,8 +445,8 @@ class Manager(object):
         try:
             _sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             _sock.connect((host,port))
-            self._sock = _sock.makefile ()
-            _sock.close ()
+            self._sock = _sock.makefile(mode='rwb')
+            _sock.close()
         except socket.error as err:
             errno, reason = err
             raise ManagerSocketException(errno, reason)
@@ -554,9 +557,6 @@ class Manager(object):
         if caller_id: cdict['CallerID'] = caller_id
         if async:     cdict['Async']    = 'yes'
         if account:   cdict['Account']  = account
-        # join dict of vairables together in a string in the form of 'key=val|key=val'
-        # with the latest CVS HEAD this is no longer necessary
-        # if variables: cdict['Variable'] = '|'.join(['='.join((str(key), str(value))) for key, value in variables.items()])
         if variables: cdict['Variable'] = ['='.join((str(key), str(value))) for key, value in variables.items()]
               
         response = self.send_action(cdict)

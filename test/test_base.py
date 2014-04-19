@@ -1,8 +1,10 @@
+from __future__ import absolute_import
+from __future__ import unicode_literals
 import sys
 import socket
 import unittest
 from   asterisk.manager import Manager
-from   asterisk.compat import Queue
+from   asterisk.compat import Queue, string_types
 from   asterisk.astemu import Event, AsteriskEmu
 
 class Test_Manager(unittest.TestCase):
@@ -40,10 +42,10 @@ class Test_Manager(unittest.TestCase):
         self.manager.register_event ('*', self.handler)
 
     def compare_result(self, r_event, event):
-        for k, v in event.iteritems():
+        for k, v in event.items():
             if k == 'CONTENT':
                 self.assertEqual(r_event.data, v)
-            elif isinstance(v, str):
+            elif isinstance(v, string_types):
                 self.assertEqual(r_event[k], v)
             else:
                 self.assertEqual(r_event[k], v[-1])
@@ -481,7 +483,7 @@ lcr/556              s@attendoparse:9     Up Read(dtmf,,30,noanswer,,2)
         for s in events['Login'][3]['Privilege'].split('\r\n'):
             if s.startswith('Event:'):
                 evnames.append(s.split(':')[1].strip())
-        for k in xrange(30):
+        for k in range(30):
             n = self.queue.get()
             e = self.events[n]
             if n < 2:
