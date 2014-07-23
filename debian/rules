@@ -3,14 +3,14 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
-export PYBUILD_NAME=python-pyst
+export PYBUILD_NAME=pyst
 
 %:
 	dh $@ --with python2,python3 --buildsystem=pybuild
 
 override_dh_auto_test:
 ifeq "$(filter nocheck,$(DEB_BUILD_OPTIONS))" ""
-	set -ex; for python in $(shell pyversions -s); do\
+	set -ex; for python in $(shell pyversions -s) $(shell py3versions -s); do\
 	        PYTHONPATH=. $$python test/test_base.py; \
 	done
 endif
