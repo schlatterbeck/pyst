@@ -79,7 +79,7 @@ class AGI:
             key,data = line.split(':')[0], ':'.join(line.split(':')[1:])
             key = key.strip()
             data = data.strip()
-            if key <> '':
+            if key != '':
                 self.env[key] = data
         self.stderr.write('class AGI: self.env = ')
         self.stderr.write(pprint.pformat(self.env))
