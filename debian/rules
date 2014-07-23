@@ -3,8 +3,10 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
+export PYBUILD_NAME=python-pyst
+
 %:
-	dh $@ --with python2
+	dh $@ --with python2,python3 --buildsystem=pybuild
 
 override_dh_auto_test:
 ifeq "$(filter nocheck,$(DEB_BUILD_OPTIONS))" ""
