@@ -1,4 +1,4 @@
-python-pyst (0.6+git1-7f3e19c6d-1) unstable; urgency=medium
+python-pyst (0.6.99+git1-7f3e19c6d-1) unstable; urgency=medium
 
   * Updated to current Upstream
     * plus three py3 fixes
