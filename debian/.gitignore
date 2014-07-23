@@ -1,0 +1,6 @@
+/files
+/*.log
+/*.debhelper
+/python3-pyst
+/python-pyst
+/*.substvars
