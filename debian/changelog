@@ -1,6 +1,7 @@
 python-pyst (0.6+git1-7f3e19c6d-1) unstable; urgency=medium
 
   * Updated to current Upstream
+    * plus two py3 fixes
   * Build for Python3
 
  -- Matthias Urlichs <matthias@urlichs.de>  Wed, 23 Jul 2014 10:28:27 +0200

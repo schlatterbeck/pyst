@@ -75,9 +75,10 @@ def scanvars(reader, frame, locals):
     return vars
 
 
-def text((etype, evalue, etb), context=5):
+def text(exc, context=5):
     """Return a plain text document describing a given traceback."""
     import os, types, time, traceback, linecache, inspect, pydoc
+    (etype, evalue, etb) = exc
 
     if type(etype) is types.ClassType:
         etype = etype.__name__
