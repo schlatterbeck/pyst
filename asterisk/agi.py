@@ -103,7 +103,7 @@ class AGI:
         try:
             self.send_command(command, *args)
             return self.get_result()
-        except IOError,e:
+        except IOError as e:
             if e.errno == 32:
                 # Broken Pipe * let us go
                 raise AGISIGPIPEHangup("Received SIGPIPE")
