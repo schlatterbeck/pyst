@@ -3,8 +3,14 @@
 # Uncomment this to turn on verbose mode.
 #export DH_VERBOSE=1
 
-DEB_PYTHON_SYSTEM=pysupport
+%:
+	dh $@ --with python2
 
-include /usr/share/cdbs/1/rules/debhelper.mk
-include /usr/share/cdbs/1/class/python-distutils.mk
+override_dh_auto_test:
+ifeq "$(filter nocheck,$(DEB_BUILD_OPTIONS))" ""
+	set -ex; for python in $(shell pyversions -s); do\
+	        PYTHONPATH=. $$python test/test_base.py; \
+	done
+endif
 
+.PHONY: override_dh_auto_test

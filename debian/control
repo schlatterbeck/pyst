@@ -1,21 +1,26 @@
-Source: pyst
+Source: python-pyst
 Section: python
 Priority: optional
-Maintainer: Matthew Nicholson <mnicholson@digium.com>
-Build-Depends-Indep: debhelper (>= 5.0.37.2), cdbs (>= 0.4.43), python-all-dev (>= 2.3.5-11), python-support (>= 0.3)
-Standards-Version: 3.6.1
+Maintainer: Debian VoIP Team <pkg-voip-maintainers@lists.alioth.debian.org>
+Uploaders: Apollon Oikonomopoulos <apoikos@debian.org>
+Build-Depends: debhelper (>= 9), python-all, python-setuptools
+Standards-Version: 3.9.5
+X-Python-Version: >= 2.6
+Vcs-Browser: http://anonscm.debian.org/gitweb/?p=pkg-voip/python-pyst.git;a=summary
+Vcs-Git: git://anonscm.debian.org/pkg-voip/python-pyst.git
 
 Package: python-pyst
 Architecture: all
-Depends: ${python:Depends}
+Depends: ${misc:Depends}, ${python:Depends}
 Provides: ${python:Provides}
-Replaces: python2.3-pyst (<< 0.2)
-Conflicts: python2.3-pyst (<< 0.2)
-XB-Python-Version: ${python:Versions}
-Suggests: asterisk
-Description: Python module for interacting with the Asterisk PBX (dummy)
- Pyst is a python module for interacting with the asterisk pbx through
- the manager interface and agi interface.  This package also includes
- debugging tools such as the agitb module, and tools to parse asterisk
- config files.
-
+Enhances: asterisk
+Description: Python module for interacting with the Asterisk PBX
+ Pyst consists of a set of interfaces and libraries to allow programming and
+ control of Asterisk from Python. The library currently supports:
+ .
+  * AGI (Asterisk Gateway Interface)
+  * AMI (Asterisk Manager Interface)
+  * parsing of Asterisk configuration files
+ .
+ It also provides a helper module to display Python AGI backtraces in the
+ Asterisk console.
