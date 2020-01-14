@@ -545,19 +545,19 @@ class Manager(object):
 
         return response
 
-    def originate(self, channel, exten, context='', priority='', timeout='', caller_id='', async=False, account='', variables={}):
+    def originate(self, channel, exten, context='', priority='', timeout='', caller_id='', asynchronous=False, account='', variables={}):
         """Originate a call"""
 
         cdict = {'Action':'Originate'}
         cdict['Channel'] = channel
         cdict['Exten'] = exten
-        if context:   cdict['Context']  = context
-        if priority:  cdict['Priority'] = priority
-        if timeout:   cdict['Timeout']  = timeout
-        if caller_id: cdict['CallerID'] = caller_id
-        if async:     cdict['Async']    = 'yes'
-        if account:   cdict['Account']  = account
-        if variables: cdict['Variable'] = ['='.join((str(key), str(value))) for key, value in variables.items()]
+        if context:      cdict['Context']  = context
+        if priority:     cdict['Priority'] = priority
+        if timeout:      cdict['Timeout']  = timeout
+        if caller_id:    cdict['CallerID'] = caller_id
+        if asynchronous: cdict['Async']    = 'yes'
+        if account:      cdict['Account']  = account
+        if variables:    cdict['Variable'] = ['='.join((str(key), str(value))) for key, value in variables.items()]
 
         response = self.send_action(cdict)
 
