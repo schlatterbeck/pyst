@@ -571,8 +571,6 @@ class AGI:
         is set and returns the variable in parenthesis
         example return code: 200 result=1 (testvariable)
         """
-        family = '"%s"' % family
-        key = '"%s"' % key
         result = self.execute('DATABASE GET', self._quote(family), self._quote(key))
         res, value = result['result']
         if res == '0':
