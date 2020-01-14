@@ -63,7 +63,7 @@ python runs.
 Credits
 -------
 
-Thanks to Karl Putland for writing the original package. 
+Thanks to Karl Putland for writing the original package.
 Thanks to Matthew Nicholson for maintaining the package for some years
 and for handing over maintenance when he was no longer interested.
 
@@ -152,7 +152,7 @@ The current versions are kept in a GIT repository on Sourceforge.
 You can check out the trunk with::
 
     git clone git://git.code.sf.net/p/pyst/code pyst
-    
+
 There is a monotone-after-0.2 branch which contains unreleased changes
 after 0.2 which were committed to the monotone repository after the
 Release of Version 0.2 (which have been merged into trunk *after*
@@ -221,7 +221,7 @@ Version 0.3: Minor feature enhancements
 
 New maintainer Ralf Schlatterbeck, this is my first release, please
 report any problems via the Sourceforge Bug-Tracker or email me
-directly. Thanks to Karl Putland for writing the original package. 
+directly. Thanks to Karl Putland for writing the original package.
 Thanks to Matthew Nicholson for maintaining the package for some years
 and for handing over maintenance when he was no longer interested.
 The parsing of answers from asterisk was completely rewritten. This

@@ -2,12 +2,13 @@
 # git clone git://git.code.sf.net/p/sfreleasetools/code sfreleasetools
 # And point the environment variable RELEASETOOLS to the checkout
 
+README=README.rst
 ifeq (,${RELEASETOOLS})
     RELEASETOOLS=../releasetools
 endif
 PKG=asterisk
 PY=agi.py agitb.py astemu.py compat.py config.py __init__.py manager.py
-SRC=Makefile MANIFEST.in setup.py README README.html \
+SRC=Makefile MANIFEST.in setup.py $(README) README.html \
     $(PY:%.py=$(PKG)/%.py)
 
 VERSIONPY=asterisk/Version.py
