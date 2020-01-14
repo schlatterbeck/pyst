@@ -17,21 +17,21 @@ This module provides a Python API for interfacing with the asterisk manager.
       print ("Received shutdown event")
       manager.close()
       # we could analyze the event and reconnect here
-      
+
    def handle_event(event, manager):
       print ("Received event: %s" % event.name)
-   
+
    manager = asterisk.manager.Manager()
    try:
        # connect to the manager
        try:
-          manager.connect('host') 
+          manager.connect('host')
           manager.login('user', 'secret')
 
            # register some callbacks
            manager.register_event('Shutdown', handle_shutdown) # shutdown
            manager.register_event('*', handle_event)           # catch all
-           
+
            # get a status report
            response = manager.status()
 
@@ -46,7 +46,7 @@ This module provides a Python API for interfacing with the asterisk manager.
        except asterisk.manager.ManagerException as reason:
           print ("Error: %s" % reason)
           sys.exit(1)
-          
+
    finally:
       # remember to clean up
       manager.close()
@@ -67,7 +67,7 @@ from asterisk.compat import Queue, string_types
 
 EOL = '\r\n'
 
-class _Msg(object): 
+class _Msg(object):
     def has_header(self, hname):
         """Check for a header"""
         return hname in self.headers
@@ -84,7 +84,7 @@ class _Msg(object):
         return self.headers['Response']
 
 
-class ManagerMsg(_Msg): 
+class ManagerMsg(_Msg):
     """A manager interface message"""
     def __init__(self, response):
         # the raw response, straight from the horse's mouth:
@@ -92,7 +92,7 @@ class ManagerMsg(_Msg):
         self.data = ''
         self.headers = {}
         self.multiheaders = {}
-        
+
         # parse the response
         self.parse(response)
 
@@ -119,7 +119,7 @@ class ManagerMsg(_Msg):
             else:
                 self.headers['Response'] = 'Generated Header'
                 self.multiheaders ['Response'] = ['Generated Header']
-        
+
     def parse(self, response):
         """Parse a manager message"""
 
@@ -158,7 +158,7 @@ class Event(_Msg):
 
         # get the event name
         self.name = message.get_header('Event')
-    
+
     def __repr__(self):
         return self.headers['Event']
 
@@ -171,7 +171,7 @@ class Manager(object):
         self.title = None     # set by received greeting
         self._connected = threading.Event()
         self._running = threading.Event()
-        
+
         # our hostname
         self.hostname = socket.gethostname()
         # pid -- used for unique naming of ActionID
@@ -190,11 +190,11 @@ class Manager(object):
         # sequence stuff
         self._seqlock = threading.Lock()
         self._seq = 0
-       
+
         # some threads
         self.message_thread = threading.Thread(target=self.message_loop)
         self.event_dispatch_thread = threading.Thread(target=self.event_dispatch)
-        
+
         self.message_thread.setDaemon(True)
         self.event_dispatch_thread.setDaemon(True)
 
@@ -216,11 +216,11 @@ class Manager(object):
         finally:
             self._seq += 1
             self._seqlock.release()
-        
+
     def send_action(self, cdict={}, **kwargs):
         """
         Send a command to the manager
-        
+
         If a list is passed to the cdict argument, each item in the list will
         be sent to asterisk under the same header in the following manner:
 
@@ -237,7 +237,7 @@ class Manager(object):
 
         if not self._connected.isSet():
             raise ManagerException("Not connected")
-        
+
         # fill in our args
         cdict.update(kwargs)
 
@@ -342,7 +342,7 @@ class Manager(object):
                 self._connected.clear()
                 self._message_queue.put(None)
 
-    
+
     def register_event(self, event, function):
         """
         Register a callback for the specfied event.
@@ -405,7 +405,7 @@ class Manager(object):
         finally:
             # wait for our data receiving thread to exit
             t.join()
-                            
+
 
     def event_dispatch(self):
         """This thread is responsible for dispatching events"""
@@ -418,14 +418,14 @@ class Manager(object):
             # if we got None as an event, we are finished
             if not ev:
                 break
-            
+
             # dispatch our events
 
             # first build a list of the functions to execute
             callbacks = (self._event_callbacks.get(ev.name, [])
                       +  self._event_callbacks.get('*', []))
 
-            # now execute the functions  
+            # now execute the functions
             for callback in callbacks:
                if callback(ev, self):
                   break
@@ -466,11 +466,11 @@ class Manager(object):
 
     def close(self):
         """Shutdown the connection to the manager"""
-        
+
         # if we are still running, logout
         if self._running.isSet() and self._connected.isSet():
             self.logoff()
-         
+
         if self._running.isSet():
             # put None in the message_queue to kill our threads
             self._message_queue.put(None)
@@ -482,22 +482,22 @@ class Manager(object):
             if threading.currentThread() != self.event_dispatch_thread:
                 # wait for the dispatch thread to exit
                 self.event_dispatch_thread.join()
-            
+
         self._running.clear()
 
 # Manager actions
 
     def login(self, username, secret):
         """Login to the manager, throws ManagerAuthException when login falis"""
-           
+
         cdict = {'Action':'Login'}
         cdict['Username'] = username
         cdict['Secret'] = secret
         response = self.send_action(cdict)
-        
+
         if response.get_header('Response') == 'Error':
            raise ManagerAuthException(response.get_header('Message'))
-        
+
         return response
 
     def ping(self):
@@ -511,16 +511,16 @@ class Manager(object):
 
         cdict = {'Action':'Logoff'}
         response = self.send_action(cdict)
-        
+
         return response
 
     def hangup(self, channel):
         """Hangup the specified channel"""
-    
+
         cdict = {'Action':'Hangup'}
         cdict['Channel'] = channel
         response = self.send_action(cdict)
-        
+
         return response
 
     def status(self, channel = ''):
@@ -529,12 +529,12 @@ class Manager(object):
         cdict = {'Action':'Status'}
         cdict['Channel'] = channel
         response = self.send_action(cdict)
-        
+
         return response
 
     def redirect(self, channel, exten, priority='1', extra_channel='', context=''):
         """Redirect a channel"""
-    
+
         cdict = {'Action':'Redirect'}
         cdict['Channel'] = channel
         cdict['Exten'] = exten
@@ -542,7 +542,7 @@ class Manager(object):
         if context:   cdict['Context']  = context
         if extra_channel: cdict['ExtraChannel'] = extra_channel
         response = self.send_action(cdict)
-        
+
         return response
 
     def originate(self, channel, exten, context='', priority='', timeout='', caller_id='', async=False, account='', variables={}):
@@ -558,18 +558,18 @@ class Manager(object):
         if async:     cdict['Async']    = 'yes'
         if account:   cdict['Account']  = account
         if variables: cdict['Variable'] = ['='.join((str(key), str(value))) for key, value in variables.items()]
-              
+
         response = self.send_action(cdict)
-        
+
         return response
 
     def mailbox_status(self, mailbox):
         """Get the status of the specfied mailbox"""
-     
+
         cdict = {'Action':'MailboxStatus'}
         cdict['Mailbox'] = mailbox
         response = self.send_action(cdict)
-        
+
         return response
 
     def command(self, command):
@@ -578,7 +578,7 @@ class Manager(object):
         cdict = {'Action':'Command'}
         cdict['Command'] = command
         response = self.send_action(cdict)
-        
+
         return response
 
     def extension_state(self, exten, context):
@@ -588,7 +588,7 @@ class Manager(object):
         cdict['Exten'] = exten
         cdict['Context'] = context
         response = self.send_action(cdict)
-        
+
         return response
 
     def playdtmf (self, channel, digit) :
@@ -602,7 +602,7 @@ class Manager(object):
 
     def absolute_timeout(self, channel, timeout):
         """Set an absolute timeout on a channel"""
-        
+
         cdict = {'Action':'AbsoluteTimeout'}
         cdict['Channel'] = channel
         cdict['Timeout'] = timeout

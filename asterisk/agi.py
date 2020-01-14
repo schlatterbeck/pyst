@@ -20,7 +20,6 @@ pyvr
 """
 
 import sys, pprint, re
-from types import ListType
 import signal
 
 DEFAULT_TIMEOUT = 2000 # 2sec timeout used as default for functions that take timeouts
@@ -52,9 +51,9 @@ class AGI:
     """
     This class encapsulates communication between Asterisk an a python script.
     It handles encoding commands to Asterisk and parsing responses from
-    Asterisk. 
+    Asterisk.
     """
-    
+
     def __init__(self,stdin=sys.stdin,stdout=sys.stdout,stderr=sys.stderr):
         self.stdin=stdin
         self.stdout=stdout
@@ -96,7 +95,7 @@ class AGI:
         """This function throws AGIHangup if we have recieved a SIGHUP"""
         if self._got_sighup:
            raise AGISIGHUPHangup("Received SIGHUP from Asterisk")
-        
+
     def execute(self, command, *args):
         self.test_hangup()
 
@@ -160,7 +159,7 @@ class AGI:
             raise AGIUnknownError(code, 'Unhandled code or undefined response')
 
     def _process_digit_list(self, digits):
-        if type(digits) == ListType:
+        if type(digits) == type([]):
             digits = ''.join(map(str, digits))
         return self._quote(digits)
 
@@ -211,17 +210,17 @@ class AGI:
 
     def tdd_mode(self, mode='off'):
         """agi.tdd_mode(mode='on'|'off') --> None
-        Enable/Disable TDD transmission/reception on a channel. 
+        Enable/Disable TDD transmission/reception on a channel.
         Throws AGIAppError if channel is not TDD-capable.
         """
         res = self.execute('TDD MODE', mode)['result'][0]
         if res == '0':
             raise AGIAppError('Channel %s is not TDD-capable')
-            
+
     def stream_file(self, filename, escape_digits='', sample_offset=0):
         """agi.stream_file(filename, escape_digits='', sample_offset=0) --> digit
         Send the given file, allowing playback to be interrupted by the given
-        digits, if any.  escape_digits is a string '12345' or a list  of 
+        digits, if any.  escape_digits is a string '12345' or a list of
         ints [1,2,3,4,5] or strings ['1','2','3'] or mixed [1,'2',3,'4']
         If sample offset is provided then the audio will seek to sample
         offset before play starts.  Returns  digit if one was pressed.
@@ -238,11 +237,11 @@ class AGI:
                 return chr(int(res))
             except:
                 raise AGIError('Unable to convert result to char: %s' % res)
-    
+
     def control_stream_file(self, filename, escape_digits='', skipms=3000, fwd='', rew='', pause=''):
         """
         Send the given file, allowing playback to be interrupted by the given
-        digits, if any.  escape_digits is a string '12345' or a list  of 
+        digits, if any.  escape_digits is a string '12345' or a list  of
         ints [1,2,3,4,5] or strings ['1','2','3'] or mixed [1,'2',3,'4']
         If sample offset is provided then the audio will seek to sample
         offset before play starts.  Returns  digit if one was pressed.
@@ -273,7 +272,7 @@ class AGI:
     def say_digits(self, digits, escape_digits=''):
         """agi.say_digits(digits, escape_digits='') --> digit
         Say a given digit string, returning early if any of the given DTMF digits
-        are received on the channel.  
+        are received on the channel.
         Throws AGIError on channel failure
         """
         digits = self._process_digit_list(digits)
@@ -290,7 +289,7 @@ class AGI:
     def say_number(self, number, escape_digits=''):
         """agi.say_number(number, escape_digits='') --> digit
         Say a given digit string, returning early if any of the given DTMF digits
-        are received on the channel.  
+        are received on the channel.
         Throws AGIError on channel failure
         """
         number = self._process_digit_list(number)
@@ -307,7 +306,7 @@ class AGI:
     def say_alpha(self, characters, escape_digits=''):
         """agi.say_alpha(string, escape_digits='') --> digit
         Say a given character string, returning early if any of the given DTMF
-        digits are received on the channel.  
+        digits are received on the channel.
         Throws AGIError on channel failure
         """
         characters = self._process_digit_list(characters)
@@ -324,7 +323,7 @@ class AGI:
     def say_phonetic(self, characters, escape_digits=''):
         """agi.say_phonetic(string, escape_digits='') --> digit
         Phonetically say a given character string, returning early if any of
-        the given DTMF digits are received on the channel.  
+        the given DTMF digits are received on the channel.
         Throws AGIError on channel failure
         """
         characters = self._process_digit_list(characters)
@@ -367,7 +366,7 @@ class AGI:
                 return chr(int(res))
             except:
                 raise AGIError('Unable to convert result to char: %s' % res)
-    
+
     def say_datetime(self, seconds, escape_digits='', format='', zone=''):
         """agi.say_datetime(seconds, escape_digits='', format='', zone='') --> digit
         Say a given date in the format specfied (see voicemail.conf), returning
@@ -392,11 +391,11 @@ class AGI:
         result = self.execute('GET DATA', filename, timeout, max_digits)
         res, value = result['result']
         return res
-    
+
     def get_option(self, filename, escape_digits='', timeout=0):
         """agi.get_option(filename, escape_digits='', timeout=0) --> digit
         Send the given file, allowing playback to be interrupted by the given
-        digits, if any.  escape_digits is a string '12345' or a list  of 
+        digits, if any.  escape_digits is a string '12345' or a list  of
         ints [1,2,3,4,5] or strings ['1','2','3'] or mixed [1,'2',3,'4']
         Returns  digit if one was pressed.
         Throws AGIError if the channel was disconnected.  Remember, the file
@@ -452,9 +451,9 @@ class AGI:
     def record_file(self, filename, format='gsm', escape_digits='#', timeout=DEFAULT_RECORD, offset=0, beep='beep'):
         """agi.record_file(filename, format, escape_digits, timeout=DEFAULT_TIMEOUT, offset=0, beep='beep') --> None
         Record to a file until a given dtmf digit in the sequence is received
-        The format will specify what kind of file will be recorded.  The timeout 
-        is the maximum record time in milliseconds, or -1 for no timeout. Offset 
-        samples is optional, and if provided will seek to the offset without 
+        The format will specify what kind of file will be recorded.  The timeout
+        is the maximum record time in milliseconds, or -1 for no timeout. Offset
+        samples is optional, and if provided will seek to the offset without
         exceeding the end of the file
         """
         escape_digits = self._process_digit_list(escape_digits)
@@ -592,7 +591,7 @@ class AGI:
         res, value = result['result']
         if res == '0':
             raise AGIDBError('Unable to put vaule in databale: family=%s, key=%s, value=%s' % (family, key, value))
-            
+
     def database_del(self, family, key):
         """agi.database_del(family, key) --> None
         Deletes an entry in the Asterisk database for a
