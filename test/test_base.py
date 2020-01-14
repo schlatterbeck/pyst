@@ -1,11 +1,16 @@
 from __future__ import absolute_import
 from __future__ import unicode_literals
+from __future__ import print_function
+from __future__ import unicode_literals
 import sys
+import os
 import socket
 import unittest
+from   subprocess import Popen
 from   asterisk.manager import Manager
 from   asterisk.compat import Queue, string_types
 from   asterisk.astemu import Event, AsteriskEmu
+from   asterisk.agi import AGI, AGIDBError
 
 class Test_Manager(unittest.TestCase):
     """ Test the asterisk management interface.
@@ -528,9 +533,289 @@ lcr/556              s@attendoparse:9     Up Read(dtmf,,30,noanswer,,2)
             n = self.queue.get()
             self.compare_result(self.events[n], events['Login'][n+1])
 
+class AGI_Emu(object):
+    """ Test AGI: behave like an asterisk counterpart for testing AGI
+        Note that we can't test some side effects like produced by
+        'say_digits' or 'goto_on_exit' that are not visible in the
+        command-exchange. But we can provide correct error messages etc.
+
+        AGI initial handshake is mostly taken from
+        http://www.asteriskdocs.org/en/2nd_Edition/asterisk-book-html-chunk
+        /asterisk-CHP-9-SECT-5.html
+    """
+
+    def __init__(self, stdin=None, stdout=None, stderr=None):
+        self.stdin = stdin or sys.stdin
+        self.stdout = stdout or sys.stdout
+        self.stderr = stderr or sys.stderr
+        self.variables={}
+        self.database={}
+        print("agi_request: testscript.py", file=self.stdout)
+        print("agi_channel: Zap/1-1", file=self.stdout)
+        print("agi_language: en", file=self.stdout)
+        print("agi_type: Zap", file=self.stdout)
+        print("agi_uniqueid: 1116732890.8", file=self.stdout)
+        print("agi_callerid: 101", file=self.stdout)
+        print("agi_calleridname: Tom Jones", file=self.stdout)
+        print("agi_callingpres: 0", file=self.stdout)
+        print("agi_callingani2: 0", file=self.stdout)
+        print("agi_callington: 0", file=self.stdout)
+        print("agi_callingtns: 0", file=self.stdout)
+        print("agi_dnid: unknown", file=self.stdout)
+        print("agi_rdnis: unknown", file=self.stdout)
+        print("agi_context: incoming", file=self.stdout)
+        print("agi_extension: 141", file=self.stdout)
+        print("agi_priority: 2", file=self.stdout)
+        print("agi_enhanced: 0.0", file=self.stdout)
+        print("agi_accountcode:", file=self.stdout)
+        print("", file=self.stdout)
+        self.stdout.flush()
+
+        print("Init done", file=self.stderr)
+
+    known_commands = dict.fromkeys \
+        (( "ANSWER"
+        ,  "HANGUP"
+        ,  "record_file"
+        ,  "say_digits"
+        ,  "stream_file"
+        ))
+
+    def run(self):
+        """ Read single line, check if the received command is known,
+            call the command function if we have one or directly issue a
+            200 response if we have no handler. If the command is
+            unknown we directly return an error.
+        """
+        print("In Emu.run", file=self.stderr)
+        while True:
+            line = self.stdin.readline()
+            if not line:
+                break
+            print("Recv: %s" % line, file=self.stderr)
+            tokens = line.split()
+            if len(tokens) < 1:
+                print("500 result=-1", file=self.stdout)
+                self.stdout.flush()
+                break
+            cmd = getattr(self, 'cmd_' + tokens[0].lower(), None)
+            if tokens[0] in self.known_commands:
+                print("200 result=0", file=self.stdout)
+                self.stdout.flush()
+            elif cmd:
+                cmd(*tokens[1:])
+            else:
+                print("500 result=-1", file=self.stdout)
+                self.stdout.flush()
+
+    def cmd_database(self, *args):
+        if not 3 <= len(args) <= 4:
+            print("500 result=-1", file=self.stdout)
+            self.stdout.flush()
+            return
+        print ("database: %s" % ','.join (args), file=self.stderr)
+        k1, k2 = (args[i].strip('"') for i in range(1, 3))
+        if args[0] == 'DEL':
+            if len(args) != 3:
+                print("500 result=-1", file=self.stdout)
+                self.stdout.flush()
+                return
+            if k1 not in self.database:
+                self.database[k1] = {}
+            if k2 in self.database[k1]:
+                del self.database[k1][k2]
+                print("200 result=1", file=self.stdout)
+                self.stdout.flush()
+                return
+            else:
+                print("200 result=0", file=self.stdout)
+                self.stdout.flush()
+                return
+        if args[0] == 'DELTREE':
+            if len(args) != 3:
+                print("500 result=-1", file=self.stdout)
+                self.stdout.flush()
+                return
+            if k1 in self.database:
+                del self.database[k1]
+                print("200 result=1", file=self.stdout)
+                self.stdout.flush()
+                return
+            else:
+                print("200 result=0", file=self.stdout)
+                self.stdout.flush()
+                return
+        if args[0] == 'GET':
+            print ("db: %s" % self.database, file=self.stderr)
+            if len(args) != 3:
+                print("500 result=-1", file=self.stdout)
+                self.stdout.flush()
+                return
+            if k1 not in self.database:
+                self.database[k1] = {}
+            v = self.database[k1].get (k2, None)
+            if v:
+                print("200 result=1 (%s)" % v, file=self.stdout)
+                self.stdout.flush()
+                return
+            else:
+                print("200 result=0", file=self.stdout)
+                self.stdout.flush()
+                return
+        elif args[0] == 'PUT':
+            if len(args) != 4:
+                print("500 result=-1", file=self.stdout)
+                self.stdout.flush()
+                return
+            if k1 not in self.database:
+                self.database[k1] = {}
+            self.database [k1][k2] = args[3].strip ('"')
+            print ("after put db: %s" % self.database, file=self.stderr)
+            print("200 result=1 (%s)" % args[3], file=self.stdout)
+            self.stdout.flush()
+            return
+        else:
+            print("500 result=-1", file=self.stdout)
+            self.stdout.flush()
+            return
+
+    def cmd_get(self, *args):
+        if not 2 <= len(args) <= 4:
+            print("500 result=-1", file=self.stdout)
+            self.stdout.flush()
+            return
+        if args[0] == 'DATA':
+            print("200 result=1", file=self.stdout)
+            self.stdout.flush()
+            return
+        if args[0] not in ('VARIABLE', 'FULL'):
+            print("500 result=-1", file=self.stdout)
+            self.stdout.flush()
+            return
+        if args[0] == 'VARIABLE':
+            k = args[1].strip('"')
+            if len(args) != 2:
+                print("500 result=-1", file=self.stdout)
+                self.stdout.flush()
+                return
+            if k in self.variables:
+                print("200 result=1 (%s)" % self.variables[k],
+                    file=self.stdout)
+                self.stdout.flush()
+                return
+            else:
+                print("200 result=0", file=self.stdout)
+                self.stdout.flush()
+                return
+        if args[0] == 'FULL':
+            if args[1] != 'VARIABLE':
+                print("500 result=-1", file=self.stdout)
+                self.stdout.flush()
+                return
+            k = args[2].strip('"')
+            if len(k) < 3:
+                print("500 result=-1", file=self.stdout)
+                self.stdout.flush()
+                return
+            print("get full: args=%s" % ','.join(args), file=self.stderr)
+            if not k.startswith('$'):
+                print("200 result=0", file=self.stdout)
+                self.stdout.flush()
+                return
+            if k[1]=='{' and k[-1] == '}':
+                v = self.variables.get(k[2:-1], None)
+                if v:
+                    print("200 result=1 (%s)" % v, file=self.stdout)
+                    self.stdout.flush()
+                    return
+                else:
+                    print("200 result=0", file=self.stdout)
+                    self.stdout.flush()
+                    return
+            # Don't handle other cases
+            print("200 result=0", file=self.stdout)
+            self.stdout.flush()
+            return
+        
+    def cmd_set(self, *args):
+        if len(args) != 3:
+            print("500 result=-1", file=self.stdout)
+            self.stdout.flush()
+            return
+        if args[0] != 'VARIABLE':
+            print("500 result=-1", file=self.stdout)
+            self.stdout.flush()
+            return
+        self.variables[args[1].strip ('"')] = args[2].strip ('"')
+        print("200 result=1", file=self.stdout)
+        self.stdout.flush()
+    
+
+
+class Test_AGI(unittest.TestCase):
+    def setUp(self):
+        # Create pipes, one from test to agi, one from agi to test
+        pipe = os.pipe()
+        self.stdin = os.fdopen(pipe[0], 'r')
+        self.stdin_w = os.fdopen(pipe[1], 'w')
+        pipe = os.pipe()
+        self.stdout = os.fdopen(pipe[1], 'w')
+        self.stdout_r = os.fdopen(pipe[0], 'r')
+        # For now set stderr to None, we may want to capture this in the
+        # future and compare the output in a test.
+        self.stderr = open('/dev/null', 'w')
+        # Fork process, tie correct ends of pipe to subprocess and call
+        # AGI_Emu in subprocess.
+        pid = os.fork()
+        if pid: # parent
+            self.stdin_w.close()
+            self.stdout_r.close()
+            self.stdin_orig = sys.stdin
+            self.stdout_orig = sys.stdout
+            sys.stdin = self.stdin
+            sys.stdout = self.stdout
+            self.pid = pid
+        else: # child
+            self.stdin.close ()
+            self.stdout.close()
+            sys.stdout = self.stdin_w
+            sys.stdin = self.stdout_r
+            emu = AGI_Emu(sys.stdin, sys.stdout, self.stderr)
+            emu.run()
+            os._exit(0)
+        self.agi = AGI(sys.stdin, sys.stdout, self.stderr)
+
+    def tearDown(self):
+        sys.stdin.close()
+        sys.stdout.close()
+        self.stderr.close()
+        sys.stdin = self.stdin_orig
+        sys.stdout = self.stdout_orig
+        os.waitpid(self.pid, 0)
+
+    def test_variables(self):
+        self.agi.set_variable('foo', 'bar')
+        self.assertEqual(self.agi.get_variable('foo'), 'bar')
+        self.assertEqual(self.agi.get_full_variable('${foo}'), 'bar')
+        self.assertEqual(self.agi.get_variable('foobar'), '')
+
+    def test_database(self):
+        self.agi.database_put('foo', 'bar', 'foobar')
+        self.agi.database_put('foo', 'baz', 'foobaz')
+        self.agi.database_put('foo', 'bat', 'foobat')
+        self.assertEqual(self.agi.database_get('foo', 'bar'), 'foobar')
+        self.assertEqual(self.agi.database_get('foo', 'baz'), 'foobaz')
+        self.assertEqual(self.agi.database_get('foo', 'bat'), 'foobat')
+        self.assertRaises(AGIDBError, self.agi.database_get, 'foo', 'foo')
+        self.agi.database_del('foo', 'bar')
+        self.assertRaises(AGIDBError, self.agi.database_del, 'foo', 'bar')
+        self.agi.database_deltree('foo')
+        self.assertRaises(AGIDBError, self.agi.database_deltree, 'foo')
+
 def test_suite():
     suite = unittest.TestSuite()
     suite.addTest (unittest.makeSuite (Test_Manager))
+    suite.addTest (unittest.makeSuite (Test_AGI))
     return suite
 
 if __name__ == '__main__':
