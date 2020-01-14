@@ -140,6 +140,8 @@ class ManagerMsg(_Msg):
                 data.extend(response[n:])
                 break
         self.data = ''.join(data)
+        if not data and 'Output' in self.multiheaders:
+            self.data = '\n'.join(self.multiheaders['Output'])
 
 
 class Event(_Msg):
