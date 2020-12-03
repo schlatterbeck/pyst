@@ -162,23 +162,6 @@ this, I'm currently satisfied with the threaded implementation):
     hooks will be called from the host application's main loop.
 
 
-Upgrading from older versions
------------------------------
-
-If upgrading from...
-
-* 0.2:
-
-   - ``get_header()`` methods in ``manager.py`` now work like
-     ``dict.get()`` instead of ``dict[key]``
-
-
-* 0.1.0:
-
-   - ``agi.get_variable`` no longer throws an exception, instead it
-     returns an empty string when a channel variable is not set.
-   - ``manager.quit()`` has be renamed to ``manager.close()``
-
 Source Code Repository Access
 -----------------------------
 
@@ -224,7 +207,7 @@ variable where Lines with a repeated header are kept. For
 backwards-compatibility all these lines are also put into the old
 ``data`` variable, too. So if you were using ``data`` with old versions
 of asterisk your code continues to work with pyst.
-Python 2.7 has introduced a new keyword ``async``. Unfortunately we were
+Python 3.7 has introduced a new keyword ``async``. Unfortunately we were
 using this keyword as a parameter of the AMI ``originate`` call. I've
 changed this to ``run_async`` (to be compatible with pyst2, I would have
 named it simpy ``asynchronous``, see the commit history).
@@ -236,34 +219,34 @@ used for unit-tests of applications using asterisk.manager. We're using
 this in the regression test (see test directory). But this way it is
 usable by others.
 
- - Factor asterisk emulator from regression test into own module
+- Factor asterisk emulator from regression test into own module
 
 Version 0.5: Small install change
 
 Fix setup.py to include download_url. This makes it installable using
 intall tools like pip.
 
- - Add download_url to setup.py
- - Fix svn url after SourceForge upgrade
+- Add download_url to setup.py
+- Fix svn url after SourceForge upgrade
 
 Version 0.4: Minor feature enhancements
 
 Small feature extensions to AGI and Manager modules. Add a regression
 test which now covers some aspects of the manager API.
 
- - Handle events with several fields with the same name (e.g. 'Variable'
-   in the 'AgentCalled' event. Thanks to Max Nesterov for the
-   suggestion, implementation differs from the suggestion in SF patch
-   3290869. For a use-case see the give SF patch and the regression test
-   case test_agent_event.
- - Allow to use AGI module in FastAGI way via TCP connection.
-   This change allows you to specify the socket streams instead
-   sys.stdin/sys.stdout streams. Thanks to Max Nesterov for the patch.
-   Applies SF patch 3047290.
- - Add regression test framework and some test cases for manager API.
- - The generated ActionID for the manager interface now includes the
-   process-ID, this allows several concurrent processes using the
-   manager API.
+- Handle events with several fields with the same name (e.g. 'Variable'
+  in the 'AgentCalled' event. Thanks to Max Nesterov for the
+  suggestion, implementation differs from the suggestion in SF patch
+  3290869. For a use-case see the give SF patch and the regression test
+  case test_agent_event.
+- Allow to use AGI module in FastAGI way via TCP connection.
+  This change allows you to specify the socket streams instead
+  sys.stdin/sys.stdout streams. Thanks to Max Nesterov for the patch.
+  Applies SF patch 3047290.
+- Add regression test framework and some test cases for manager API.
+- The generated ActionID for the manager interface now includes the
+  process-ID, this allows several concurrent processes using the
+  manager API.
 
 Version 0.3: Minor feature enhancements
 
@@ -276,20 +259,19 @@ The parsing of answers from asterisk was completely rewritten. This
 should fix problems people were having with commands returning embedded
 '/' or empty lines. Some new manager commands added.
 
- - Add playdtmf manager command
- - add sippeers and sipshowpeer manager commands
- - rewritten manager communication
- - should no longer choke on '/' in answers returned from a manager
-   command (fixes SF Bug 2947866)
- - should now correctly parse multi-line output with embedded empty
-   lines, e.g. ``mgr.command('dialplan show')``
- - Bug-fix for list manipulation in ``event_dispatch``, thanks to Jan
-   Mueller, see mailinglist comment from 2008-04-18
- - Merge unreleased changes from repository of Matthew Nicholson
-   in particular a typo in ``agi.py`` for ``set_autohangup``, and change
-   of ``get_header`` methods (see Upgrading instructions). The fixed
-   ``manager.command`` support is already in (with a different
-   solution). The unreleased changes are also on the 0.2 branch in the
-   subversion repository in case somebody is interested.
+- Add playdtmf manager command
+- add sippeers and sipshowpeer manager commands
+- rewritten manager communication
+- should no longer choke on '/' in answers returned from a manager
+  command (fixes SF Bug 2947866)
+- should now correctly parse multi-line output with embedded empty
+  lines, e.g. ``mgr.command('dialplan show')``
+- Bug-fix for list manipulation in ``event_dispatch``, thanks to Jan
+  Mueller, see mailinglist comment from 2008-04-18
+- Merge unreleased changes from repository of Matthew Nicholson
+  in particular a typo in ``agi.py`` for ``set_autohangup``, and change
+  of ``get_header`` methods (see Upgrading instructions). The fixed
+  ``manager.command`` support is already in (with a different
+  solution). The unreleased changes are also on the 0.2 branch in the
+  subversion repository in case somebody is interested.
 
-See the ChangeLog for older changes.
