@@ -1,9 +1,3 @@
-.. image:: http://sflogo.sourceforge.net/sflogo.php?group_id=134329&type=7
-    :height: 62
-    :width: 210
-    :alt: SourceForge.net Logo
-    :target: http://sourceforge.net/projects/pyst/
-
 pyst: A Python Interface to Asterisk
 ====================================
 
@@ -12,10 +6,48 @@ Asterisk from python. The library currently supports AGI, AMI, and the parsing
 of Asterisk configuration files. The library also includes debugging facilities
 for AGI.
 
-News: The source code is now in a GIT repository on Sourceforge.
+News 2020: Updated to Python3 including Py7 which includes a new 'async'
+keyword that was used in the code. Note that there is a pyst2 project
+also on github which is a fork from an earlier version of pyst.
+Unfortunately the fork was made from the old Subversion repository and
+therefore the two repos do not share a common root in git which makes it
+hard to merge changes. Also I've introduced a regression test since then
+which afaik is not included in pyst2. The maintainers seem to have tried
+to contact me via Sourceforge but this may not have worked at the time
+due to problems forwarding mails by SF. This should no longer happen as
+in GIT every commit from me contains my correct email address now.
+
+So far I've tried to be compatible with the mentioned change of the
+async keyword so that the API will not diverge too much. Note that there
+is one ad-hoc patch in pyst2 that breaks the old API:
+
+Newer versions of Asterisk now send the output of AMI commands prefixed
+with ``Output:``.  With my version this fits nicely into the
+already-implemented ``multiheaders`` variable where Lines with a
+repeated header are kept.  So all the ``Output:`` lines already were
+correctly parsed and put into ``self.multiheaders ['Output']``. The only
+thing I had to fix was to put all these lines into the old ``data``
+variable, too. So if you were using ``data`` with old versions of
+asterisk your code continues to work with pyst. Conversely pyst2 has a
+patch that will return ``data`` prefixed with ``Output:`` (untested,
+this is how I read the code).
+
+When I have time I intend to graft the pyst2 repo onto my working copy
+(probably using reposurgeon_) and look through the changes that are
+interesting. Drop me a note if you find something in pyst2 that you
+think should be in pyst.
+
+Github repo can be cloned with::
+
+ git clone https://github.com/schlatterbeck/pyst.git
+
+
+Old News: The source code is now in a GIT repository on Sourceforge.
 To check out anonymously into the local directory ``pyst``, use::
 
  git clone git://git.code.sf.net/p/pyst/code pyst
+
+Update 2020: I will continue to push to the sourceforge repository, too.
 
 Thanks to Eric S. Raymond's `reposurgeon`_, it was possible to unite the
 old CVS repository, the monotone repository used until 0.2 (and a little
@@ -72,6 +104,8 @@ report bugs:
 Antoine Brenner,
 Max Nesterov,
 Sven Uebelacker
+To Matthias Urlichs for maintaining the debian package (at least for
+some time).
 
 ... and to unnamed contributors to earlier releases.
 
@@ -180,6 +214,20 @@ has also been incorporated into the GIT repository.
 
 Changes
 -------
+
+Version 0.7: Update tests, Compatibility
+
+Now a test for AGI exists (in addition the the existing AMI test).
+Asterisk in newer versions yields output of AMI commands prefixed with
+``Output:``. This was already correctly parsed into the ``multiheaders``
+variable where Lines with a repeated header are kept. For
+backwards-compatibility all these lines are also put into the old
+``data`` variable, too. So if you were using ``data`` with old versions
+of asterisk your code continues to work with pyst.
+Python 2.7 has introduced a new keyword ``async``. Unfortunately we were
+using this keyword as a parameter of the AMI ``originate`` call. I've
+changed this to ``run_async`` (to be compatible with pyst2, I would have
+named it simpy ``asynchronous``, see the commit history).
 
 Version 0.6: Minor feature enhancements
 
