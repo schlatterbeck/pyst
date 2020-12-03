@@ -165,8 +165,13 @@ this, I'm currently satisfied with the threaded implementation):
 Source Code Repository Access
 -----------------------------
 
-The current versions are kept in a GIT repository on Sourceforge.
+The current versions are kept in a GIT repository on Github.
 You can check out the trunk with::
+
+ git clone https://github.com/schlatterbeck/pyst.git
+
+I will continue to push to the Sourceforge version although Bug-Reports
+etc. are easier with Github. Check out from Sourceforge with::
 
     git clone git://git.code.sf.net/p/pyst/code pyst
 
