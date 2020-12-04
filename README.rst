@@ -203,6 +203,10 @@ has also been incorporated into the GIT repository.
 Changes
 -------
 
+Version 0.8: Fix README.rst
+
+Cleanup of README before releasing 0.8 on pypi.
+
 Version 0.7: Update tests, Compatibility
 
 Now a test for AGI exists (in addition the the existing AMI test).
