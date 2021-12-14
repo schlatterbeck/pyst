@@ -445,7 +445,7 @@ class Manager(object):
 
         # create our socket and connect
         try:
-            if host.find(":") > 0:
+            if host.find(":") >= 0:
                 _sock = socket.socket(socket.AF_INET6, socket.SOCK_STREAM)
                 _sock.connect((host,port,0,0))
                 self._sock = _sock.makefile(mode='rwb')
