@@ -92,6 +92,13 @@ use the *fastagi* mechanism of asterisk which calls the agi scripts on a
 remote host. In the latter case this host can be any platform where
 python runs.
 
+Tests
+-----
+
+The tests are standard pytest-compatible tests. Run with::
+
+    python3 -m pytest test
+
 Credits
 -------
 
@@ -202,6 +209,16 @@ has also been incorporated into the GIT repository.
 
 Changes
 -------
+
+Version 0.9: Add LICENSE, pyproject.toml, remove old test harness
+
+- Added LICENSE, the software always was dual-licensed, no LGPL update
+  clause ("2.0 or later") was specified at the time. The license should
+  still be GPL/LGPL 3.0 compatible due to the dual-licensing with the
+  python software foundation license.
+- New section in README.rst for running the tests after removing old
+  test harness
+- Add patch to allow connecting using IPv6
 
 Version 0.8: Fix README.rst
 

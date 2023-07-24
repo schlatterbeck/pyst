@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name            = "pyst"
+dynamic         = ["version"]
+authors         = [
+    { name="Karl Putland", email="kputland@users.sourceforge.net" },
+    { name="Matthew Nicholson", email="matt@matt-land.com" },
+    { name="Ralf Schlatterbeck", email="rsc@runtux.com" }]
+maintainers     = [ { name="Ralf Schlatterbeck", email="rsc@runtux.com" }]
+description     = "A Python Interface to Asterisk"
+readme          = "README.rst"
+license         = {text = "Python Software Foundation License, GNU Library or Lesser General Public License (LGPL) version 2"}
+requires-python = '>=3.7'
+classifiers     = [
+          'Development Status :: 5 - Production/Stable'
+        , 'Environment :: Other Environment'
+        , 'Intended Audience :: Developers'
+        , 'Intended Audience :: Telecommunications Industry'
+        , 'Operating System :: OS Independent'
+        , 'Programming Language :: Python'
+        , 'Programming Language :: Python :: 2.4'
+        , 'Programming Language :: Python :: 2.5'
+        , 'Programming Language :: Python :: 2.6'
+        , 'Programming Language :: Python :: 2.7'
+        , 'Topic :: Communications :: Internet Phone'
+        , 'Topic :: Communications :: Telephony'
+        , 'Topic :: Software Development :: Libraries :: Python Modules'
+        , 'License :: OSI Approved :: Python Software Foundation License'
+        , 'License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)'
+        ]
+
+[project.urls]
+"Homepage" = "https://github.com/schlatterbeck/pyst"
+"Bug Tracker" = "https://github.com/schlatterbeck/pyst/issues"
+
+[tool.setuptools.dynamic]
+version = {attr = "asterisk.Version.VERSION"}

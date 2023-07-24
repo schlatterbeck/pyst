@@ -17,3 +17,12 @@
 /.pybuild
 README.html
 build
+announce_pypi
+upload
+upload_pypi
+changes
+dist
+MANIFEST
+notes
+ReleaseNotes.txt
+pyst.egg-info
