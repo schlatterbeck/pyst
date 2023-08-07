@@ -1,20 +1,12 @@
 #!/usr/bin/env python
 
-from distutils.core import setup
+import sys
+from setuptools import setup
+sys.path.insert (1, '.')
+from asterisk import __version__
 
-try :
-    from asterisk.Version  import VERSION
-except :
-    VERSION = None
-
-description = []
-f = open ('README.rst')
-logo_stripped = False
-for line in f :
-    if not logo_stripped and line.strip () :
-        continue
-    logo_stripped = True
-    description.append (line)
+with open ('README.rst') as f:
+    description = f.read ()
 
 licenses = ( 'Python Software Foundation License'
            , 'GNU Library or Lesser General Public License (LGPL)'
@@ -23,7 +15,7 @@ download = "http://downloads.sourceforge.net/project/pyst/pyst"
 
 setup \
     ( name = 'pyst'
-    , version = VERSION
+    , version = __version__
     , description = 'A Python Interface to Asterisk'
     , long_description = ''.join (description)
     , author = 'Karl Putland'
@@ -35,7 +27,7 @@ setup \
     , license = ', '.join (licenses)
     , platforms = 'Any'
     , download_url = \
-        "%(download)s/%(VERSION)s/pyst-%(VERSION)s.tar.gz" % locals ()
+        "%(download)s/%(__version__)s/pyst-%(__version__)s.tar.gz" % locals ()
     , classifiers =
         [ 'Development Status :: 5 - Production/Stable'
         , 'Environment :: Other Environment'

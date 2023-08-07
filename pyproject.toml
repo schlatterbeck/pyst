@@ -37,4 +37,4 @@ classifiers     = [
 "Bug Tracker" = "https://github.com/schlatterbeck/pyst/issues"
 
 [tool.setuptools.dynamic]
-version = {attr = "asterisk.Version.VERSION"}
+version = {attr = "asterisk.__version__"}
