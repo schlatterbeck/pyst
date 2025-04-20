@@ -12,7 +12,7 @@ authors         = [
 maintainers     = [ { name="Ralf Schlatterbeck", email="rsc@runtux.com" }]
 description     = "A Python Interface to Asterisk"
 readme          = "README.rst"
-license         = {text = "Python Software Foundation License, GNU Library or Lesser General Public License (LGPL) version 2"}
+license         = "PSF-2.0 OR LGPL-2.0-only"
 requires-python = '>=3.7'
 classifiers     = [
           'Development Status :: 5 - Production/Stable'
@@ -28,8 +28,6 @@ classifiers     = [
         , 'Topic :: Communications :: Internet Phone'
         , 'Topic :: Communications :: Telephony'
         , 'Topic :: Software Development :: Libraries :: Python Modules'
-        , 'License :: OSI Approved :: Python Software Foundation License'
-        , 'License :: OSI Approved :: GNU Library or Lesser General Public License (LGPL)'
         ]
 
 [project.urls]
